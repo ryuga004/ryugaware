@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": "usr_01HQ8Z3K",
+    "fullName": "Priya Sharma",
+    "email": "priya@bloomstudio.com",
+    "emailVerified": true,
+    "role": "owner",
+    "organizationId": "org_8f2k3j9x4m",
+    "organizationName": "Bloom Studio Ltd",
+    "createdAt": "2026-03-03T08:00:00Z",
+    "passwordChangedAt": "2026-08-12T10:00:00Z"
+  }
+}

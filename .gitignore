@@ -1,0 +1,94 @@
+# ============================================================
+# Ryugaware monorepo .gitignore
+#   frontend/  -> Next.js (has its own frontend/.gitignore too)
+#   backend/   -> Go (planned)
+# ============================================================
+
+# ---------- OS / editor ----------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+*.code-workspace
+
+# ---------- Environment / secrets ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ============================================================
+# Frontend (Next.js / Node)
+# ============================================================
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+!frontend/.yarn/patches
+!frontend/.yarn/plugins
+!frontend/.yarn/releases
+!frontend/.yarn/versions
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/coverage/
+frontend/.vercel
+frontend/.turbo
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================================
+# Backend (Go)
+# ============================================================
+# Compiled binaries
+backend/bin/
+backend/dist/
+backend/tmp/
+backend/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts / coverage
+*.test
+*.out
+coverage.out
+coverage.html
+*.prof
+
+# Go workspace (local only)
+go.work
+go.work.sum
+
+# Vendored deps (remove this line if you decide to commit vendor/)
+backend/vendor/
+
+# Air (live reload) temp output
+backend/.air/
+build-errors.log
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3

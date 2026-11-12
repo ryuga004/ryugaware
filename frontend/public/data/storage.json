@@ -1,0 +1,37 @@
+{
+  "data": {
+    "status": "connected",
+    "provider": "s3",
+    "endpoint": "",
+    "bucket": "ryugaware-bloom-assets",
+    "region": "ap-south-1",
+    "accessKeyId": "AKIAIOSFODNN7EXAMPLE",
+    "secretAccessKey": "wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY3f9a",
+    "pathPrefix": "ryugaware/uploads/",
+    "publicBaseUrl": "https://cdn.bloomstudio.com",
+    "forcePathStyle": false,
+    "connectedAt": "2026-03-12T06:20:00Z",
+    "updatedAt": "2026-09-02T11:45:00Z",
+    "lastTest": {
+      "ok": true,
+      "testedAt": "2026-11-11T04:12:00Z",
+      "bucket": "ryugaware-bloom-assets",
+      "region": "ap-south-1",
+      "saved": true,
+      "steps": [
+        { "key": "bucket", "label": "Bucket reachable", "status": "passed", "message": "ryugaware-bloom-assets found in ap-south-1." },
+        { "key": "write", "label": "Write a test object", "status": "passed", "message": "Uploaded ryugaware/uploads/.ryugaware-check.txt." },
+        { "key": "read", "label": "Read it back", "status": "passed", "message": "Read 42 bytes back." },
+        { "key": "delete", "label": "Delete it", "status": "passed", "message": "Removed the test object." },
+        { "key": "public_url", "label": "Public URL", "status": "passed", "message": "Loaded the test object from https://cdn.bloomstudio.com." }
+      ]
+    },
+    "usage": {
+      "bytesUsed": 197568495616,
+      "objects": 128430,
+      "lastUploadAt": "2026-11-11T04:28:00Z",
+      "lastUploadLabel": "Bloom Studio · product image"
+    },
+    "fallbackQuotaBytes": 5368709120
+  }
+}

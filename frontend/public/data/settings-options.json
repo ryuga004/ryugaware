@@ -1,0 +1,66 @@
+{
+  "data": {
+    "languages": [
+      {
+        "value": "en",
+        "label": "English"
+      },
+      {
+        "value": "hi",
+        "label": "Hindi"
+      },
+      {
+        "value": "mr",
+        "label": "Marathi"
+      },
+      {
+        "value": "ta",
+        "label": "Tamil"
+      }
+    ],
+    "timezones": [
+      {
+        "value": "Asia/Kolkata",
+        "label": "Asia/Kolkata (GMT+5:30)"
+      },
+      {
+        "value": "Asia/Dubai",
+        "label": "Asia/Dubai (GMT+4:00)"
+      },
+      {
+        "value": "Europe/London",
+        "label": "Europe/London (GMT+0:00)"
+      },
+      {
+        "value": "America/New_York",
+        "label": "America/New_York (GMT-5:00)"
+      },
+      {
+        "value": "Asia/Singapore",
+        "label": "Asia/Singapore (GMT+8:00)"
+      }
+    ],
+    "currencies": [
+      {
+        "value": "INR",
+        "label": "INR - Indian rupee"
+      },
+      {
+        "value": "USD",
+        "label": "USD - US dollar"
+      },
+      {
+        "value": "EUR",
+        "label": "EUR - Euro"
+      },
+      {
+        "value": "AED",
+        "label": "AED - UAE dirham"
+      },
+      {
+        "value": "GBP",
+        "label": "GBP - Pound sterling"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "id": "usr_01HQ8Z3K",
+      "email": "priya@bloomstudio.com",
+      "password": "Password1!",
+      "fullName": "Priya Sharma",
+      "organizationName": "Bloom Studio Ltd",
+      "emailVerified": true,
+      "createdAt": "2026-03-03T08:00:00Z"
+    },
+    {
+      "id": "usr_01HR2M9P",
+      "email": "unverified@example.com",
+      "password": "Password1!",
+      "fullName": "Ravi Kulkarni",
+      "organizationName": "Kulkarni Traders",
+      "emailVerified": false,
+      "createdAt": "2026-11-10T09:30:00Z"
+    }
+  ],
+  "meta": { "note": "Demo credentials only. Replaced by the real identity service later." }
+}

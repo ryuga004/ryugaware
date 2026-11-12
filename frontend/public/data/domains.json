@@ -1,0 +1,100 @@
+{
+  "data": [
+    {
+      "id": "dom_01JD01",
+      "hostname": "shop.bloomstudio.com",
+      "websiteId": "web_01J8A1",
+      "websiteName": "Bloom Studio",
+      "primary": true,
+      "status": "active",
+      "ssl": "issued",
+      "failureReason": null,
+      "lastCheckedAt": "2026-11-12T09:58:00Z",
+      "createdAt": "2026-03-06T10:20:00Z"
+    },
+    {
+      "id": "dom_01JD02",
+      "hostname": "bloomstudio.com",
+      "websiteId": "web_01J8A1",
+      "websiteName": "Bloom Studio",
+      "primary": false,
+      "status": "active",
+      "ssl": "issued",
+      "failureReason": null,
+      "lastCheckedAt": "2026-11-12T09:58:00Z",
+      "createdAt": "2026-03-06T10:24:00Z"
+    },
+    {
+      "id": "dom_01JD03",
+      "hostname": "lotusyoga.in",
+      "websiteId": "web_01J8A5",
+      "websiteName": "Lotus Yoga Studio",
+      "primary": true,
+      "status": "active",
+      "ssl": "issued",
+      "failureReason": null,
+      "lastCheckedAt": "2026-11-12T09:41:00Z",
+      "createdAt": "2026-05-19T07:45:00Z"
+    },
+    {
+      "id": "dom_01JD04",
+      "hostname": "www.freshbasket.in",
+      "websiteId": "web_01J8A4",
+      "websiteName": "Fresh Basket",
+      "primary": false,
+      "status": "verifying",
+      "ssl": "pending",
+      "failureReason": null,
+      "lastCheckedAt": "2026-11-12T10:12:00Z",
+      "createdAt": "2026-11-11T16:02:00Z"
+    },
+    {
+      "id": "dom_01JD05",
+      "hostname": "kalahandloom.com",
+      "websiteId": "web_01J8A6",
+      "websiteName": "Kala Handloom",
+      "primary": false,
+      "status": "pending_dns",
+      "ssl": "none",
+      "failureReason": null,
+      "lastCheckedAt": null,
+      "createdAt": "2026-11-10T12:30:00Z"
+    },
+    {
+      "id": "dom_01JD06",
+      "hostname": "northwindcoffee.co",
+      "websiteId": "web_01J8A2",
+      "websiteName": "Northwind Coffee",
+      "primary": false,
+      "status": "failed",
+      "ssl": "none",
+      "failureReason": "The CNAME record points to northwind.netlify.app instead of Ryugaware.",
+      "lastCheckedAt": "2026-11-11T08:15:00Z",
+      "createdAt": "2026-11-04T09:00:00Z"
+    },
+    {
+      "id": "dom_01JD07",
+      "hostname": "atlasoutdoor.in",
+      "websiteId": "web_01J8A3",
+      "websiteName": "Atlas Outdoor",
+      "primary": true,
+      "status": "active",
+      "ssl": "issued",
+      "failureReason": null,
+      "lastCheckedAt": "2026-11-12T08:02:00Z",
+      "createdAt": "2026-01-22T11:10:00Z"
+    },
+    {
+      "id": "dom_01JD08",
+      "hostname": "spiceroutepantry.com",
+      "websiteId": "web_01J8A8",
+      "websiteName": "Spice Route Pantry",
+      "primary": false,
+      "status": "pending_dns",
+      "ssl": "none",
+      "failureReason": null,
+      "lastCheckedAt": "2026-11-09T18:40:00Z",
+      "createdAt": "2026-11-09T18:31:00Z"
+    }
+  ]
+}

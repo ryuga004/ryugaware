@@ -1,0 +1,154 @@
+{
+  "data": [
+    {
+      "id": "tpl_classic_store",
+      "slug": "classic-store",
+      "name": "Classic Store",
+      "category": "ecommerce",
+      "description": "A clean storefront with featured products, collections and a fast checkout.",
+      "pages": 8,
+      "features": [
+        "Products & collections",
+        "Cart & checkout",
+        "Coupons",
+        "Order tracking"
+      ],
+      "paymentMethods": [
+        "Cash on delivery",
+        "Cards",
+        "UPI"
+      ],
+      "thumbnailTheme": "classic_store",
+      "previewUrl": "https://previews.ryugaware.com/classic-store/",
+      "version": "1.2.0",
+      "status": "published",
+      "createdAt": "2026-01-15T10:00:00Z",
+      "updatedAt": "2026-10-10T10:00:00Z"
+    },
+    {
+      "id": "tpl_modern_boutique",
+      "slug": "modern-boutique",
+      "name": "Modern Boutique",
+      "category": "ecommerce",
+      "description": "Editorial layout with large imagery for fashion and lifestyle brands.",
+      "pages": 8,
+      "features": [
+        "Lookbook",
+        "Size and colour variants",
+        "Wishlist",
+        "Reviews"
+      ],
+      "paymentMethods": [
+        "Cards",
+        "UPI"
+      ],
+      "thumbnailTheme": "modern_boutique",
+      "previewUrl": "https://previews.ryugaware.com/modern-boutique/",
+      "version": "1.3.0",
+      "status": "published",
+      "createdAt": "2026-01-15T10:00:00Z",
+      "updatedAt": "2026-10-12T10:00:00Z"
+    },
+    {
+      "id": "tpl_fresh_market",
+      "slug": "fresh-market",
+      "name": "Fresh Market",
+      "category": "ecommerce",
+      "description": "A grocery-friendly catalogue with delivery zones, slots and quick reorder.",
+      "pages": 9,
+      "features": [
+        "Delivery slots",
+        "Weight-based pricing",
+        "Substitutions",
+        "Minimum order value"
+      ],
+      "paymentMethods": [
+        "Cash on delivery",
+        "UPI"
+      ],
+      "thumbnailTheme": "fresh_market",
+      "previewUrl": "https://previews.ryugaware.com/fresh-market/",
+      "version": "1.4.0",
+      "status": "published",
+      "createdAt": "2026-01-15T10:00:00Z",
+      "updatedAt": "2026-10-14T10:00:00Z"
+    },
+    {
+      "id": "tpl_studio_pro",
+      "slug": "studio-pro",
+      "name": "Studio Pro",
+      "category": "services",
+      "description": "Bookings, class schedules and a simple member area for studios.",
+      "pages": 6,
+      "features": [
+        "Class schedule",
+        "Online booking",
+        "Testimonials",
+        "Contact form"
+      ],
+      "paymentMethods": [
+        "Cards",
+        "UPI"
+      ],
+      "thumbnailTheme": "studio_pro",
+      "previewUrl": "https://previews.ryugaware.com/studio-pro/",
+      "version": "1.5.0",
+      "status": "published",
+      "createdAt": "2026-01-15T10:00:00Z",
+      "updatedAt": "2026-10-16T10:00:00Z"
+    },
+    {
+      "id": "tpl_clinic_care",
+      "slug": "clinic-care",
+      "name": "Clinic Care",
+      "category": "services",
+      "description": "Appointment-first layout with doctor profiles and service pages.",
+      "pages": 7,
+      "features": [
+        "Doctor profiles",
+        "Appointment requests",
+        "Service pages",
+        "Location map"
+      ],
+      "paymentMethods": [
+        "Cards"
+      ],
+      "thumbnailTheme": "clinic_care",
+      "previewUrl": "https://previews.ryugaware.com/clinic-care/",
+      "version": "1.6.0",
+      "status": "published",
+      "createdAt": "2026-01-15T10:00:00Z",
+      "updatedAt": "2026-10-18T10:00:00Z"
+    },
+    {
+      "id": "tpl_bistro_table",
+      "slug": "bistro-table",
+      "name": "Bistro Table",
+      "category": "services",
+      "description": "Menus, reservations and photo galleries for restaurants and cafes.",
+      "pages": 6,
+      "features": [
+        "Menu pages",
+        "Table reservations",
+        "Photo gallery",
+        "Opening hours"
+      ],
+      "paymentMethods": [
+        "Cash on delivery",
+        "Cards"
+      ],
+      "thumbnailTheme": "bistro_table",
+      "previewUrl": "https://previews.ryugaware.com/bistro-table/",
+      "version": "1.7.0",
+      "status": "published",
+      "createdAt": "2026-01-15T10:00:00Z",
+      "updatedAt": "2026-10-20T10:00:00Z"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "pageSize": 6,
+    "total": 6,
+    "totalPages": 1
+  }
+}

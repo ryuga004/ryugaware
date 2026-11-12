@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/* Ryugaware design tokens. Ember is a seasoning, not a surface: primary actions use `primary` (Ember-deep). */
+@theme {
+  --color-page: #faf4ec;
+  --color-surface: #ffffff;
+  --color-subtle: #f3ece2;
+  --color-line: #e2d6c6;
+  --color-line-strong: #d3c4b0;
+
+  --color-ink: #14100f;
+  --color-ink-800: #2a2321;
+  --color-ink-700: #3a302b;
+  --color-body: #3a302b;
+  --color-muted: #5c5046;
+  --color-faint: #9c8e82;
+  --color-on-dark: #cdbfb0;
+
+  --color-primary: #b8341a;
+  --color-primary-hover: #9c2b14;
+  --color-primary-active: #82230f;
+  --color-tint: #fbeae2;
+  --color-ember: #f0502d;
+  --color-glow: #ff8f63;
+
+  --color-success: #2e7d5b;
+  --color-success-bg: #e8f3ee;
+  --color-success-border: #bfdccc;
+  --color-warning: #b7791f;
+  --color-warning-text: #8a5a16;
+  --color-warning-bg: #fbf1df;
+  --color-warning-border: #edd4a4;
+  --color-danger: #b3261e;
+  --color-danger-hover: #931f18;
+  --color-danger-bg: #fbe9e7;
+  --color-danger-border: #efc4bf;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-logo: var(--font-orbitron), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --radius-card: 10px;
+  --radius-sheet: 16px;
+
+  --shadow-pop: 0 4px 16px rgb(20 16 15 / 0.1);
+  --shadow-drawer: 0 8px 32px rgb(20 16 15 / 0.16);
+
+  --animate-drawer-in: drawer-in 200ms ease-out;
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-toast-in: toast-in 200ms ease-out;
+  --animate-pop-in: pop-in 150ms ease-out;
+  --animate-sheet-in: sheet-in 200ms ease-out;
+}
+
+@keyframes drawer-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+html {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100dvh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

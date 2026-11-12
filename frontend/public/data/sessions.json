@@ -1,0 +1,43 @@
+{
+  "data": [
+    {
+      "id": "ses_01",
+      "device": "Chrome on macOS",
+      "deviceType": "desktop",
+      "location": "Mumbai, India",
+      "ip": "49.36.xx.xx",
+      "lastActiveAt": "2026-11-11T09:58:00Z",
+      "current": true
+    },
+    {
+      "id": "ses_02",
+      "device": "Safari on iOS",
+      "deviceType": "mobile",
+      "location": "Mumbai, India",
+      "ip": "106.205.xx.xx",
+      "lastActiveAt": "2026-11-11T07:40:00Z",
+      "current": false
+    },
+    {
+      "id": "ses_03",
+      "device": "Firefox on Windows",
+      "deviceType": "desktop",
+      "location": "Pune, India",
+      "ip": "157.48.xx.xx",
+      "lastActiveAt": "2026-11-08T16:12:00Z",
+      "current": false
+    },
+    {
+      "id": "ses_04",
+      "device": "Chrome on Android",
+      "deviceType": "mobile",
+      "location": "Bengaluru, India",
+      "ip": "122.171.xx.xx",
+      "lastActiveAt": "2026-10-29T12:30:00Z",
+      "current": false
+    }
+  ],
+  "meta": {
+    "total": 4
+  }
+}

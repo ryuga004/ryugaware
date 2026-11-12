@@ -1,0 +1,54 @@
+{
+  "data": {
+    "default": {
+      "businessName": "Bloom Studio Ltd",
+      "contactPerson": "Priya Sharma",
+      "supportEmail": "support@bloomstudio.com",
+      "phone": "9820012345",
+      "whatsappSameAsPhone": true,
+      "whatsapp": "",
+      "supportHours": "Mon–Sat, 10 am – 7 pm IST",
+      "addressLine1": "14, Linking Road, Bandra West",
+      "addressLine2": "",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "pinCode": "400050",
+      "show": { "footer": true, "contactPage": true, "invoices": true },
+      "updatedAt": "2026-10-21T08:30:00Z"
+    },
+    "overrides": {
+      "web_01J8A1": {
+        "businessName": "Bloom Studio",
+        "contactPerson": "Ananya Iyer",
+        "supportEmail": "hello@bloomstudio.com",
+        "phone": "9820045678",
+        "whatsappSameAsPhone": false,
+        "whatsapp": "9820099887",
+        "supportHours": "Every day, 11 am – 8 pm IST",
+        "addressLine1": "Shop 3, Pali Hill Arcade",
+        "addressLine2": "Pali Mala Road, Bandra West",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pinCode": "400050",
+        "show": { "footer": true, "contactPage": true, "invoices": true },
+        "updatedAt": "2026-11-06T10:10:00Z"
+      },
+      "web_01J8A7": {
+        "businessName": "Dr. Mehta Clinic",
+        "contactPerson": "Dr. Rohan Mehta",
+        "supportEmail": "appointments@mehtaclinic.in",
+        "phone": "2226451234",
+        "whatsappSameAsPhone": false,
+        "whatsapp": "",
+        "supportHours": "Mon–Fri, 9 am – 1 pm and 5 – 8 pm",
+        "addressLine1": "2nd Floor, Sunshine Towers",
+        "addressLine2": "Senapati Bapat Marg, Dadar West",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pinCode": "400028",
+        "show": { "footer": true, "contactPage": true, "invoices": false },
+        "updatedAt": "2026-09-30T05:45:00Z"
+      }
+    }
+  }
+}

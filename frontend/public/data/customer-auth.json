@@ -1,0 +1,36 @@
+{
+  "data": {
+    "default": {
+      "email": { "enabled": true, "allowSignups": true, "requireVerification": true, "minPasswordLength": 8, "sessionDays": 30 },
+      "google": {
+        "enabled": true,
+        "clientId": "1029384756-abc123def456.apps.googleusercontent.com",
+        "clientSecret": "GOCSPX-k3J9x2LmQ7vR4tY8wZ1n3f9a",
+        "allowedDomains": []
+      },
+      "updatedAt": "2026-10-28T07:15:00Z"
+    },
+    "overrides": {
+      "web_01J8A1": {
+        "email": { "enabled": true, "allowSignups": true, "requireVerification": true, "minPasswordLength": 10, "sessionDays": 30 },
+        "google": {
+          "enabled": false,
+          "clientId": "1029384756-abc123def456.apps.googleusercontent.com",
+          "clientSecret": "GOCSPX-k3J9x2LmQ7vR4tY8wZ1n3f9a",
+          "allowedDomains": []
+        },
+        "updatedAt": "2026-11-04T12:40:00Z"
+      },
+      "web_01J8A7": {
+        "email": { "enabled": true, "allowSignups": false, "requireVerification": true, "minPasswordLength": 12, "sessionDays": 1 },
+        "google": {
+          "enabled": true,
+          "clientId": "5566778899-mehtaclinic01.apps.googleusercontent.com",
+          "clientSecret": "GOCSPX-p8Q2wE4rT6yU1iO3aS5d7c21",
+          "allowedDomains": ["mehtaclinic.in"]
+        },
+        "updatedAt": "2026-09-19T09:05:00Z"
+      }
+    }
+  }
+}
