@@ -2,6 +2,7 @@ import type { BaseQueryFn } from "@reduxjs/toolkit/query";
 import { DUMMY_LATENCY_MS } from "../config";
 import type { ApiError, ApiRequest, HttpMethod } from "../types";
 import { ApiHttpError } from "./errors";
+import { db } from "./db";
 import { matchRoute } from "./router";
 import { delay, randomBetween } from "./utils";
 
@@ -18,6 +19,8 @@ import "@/features/customers/dummy";
 import "@/features/storage/dummy";
 import "@/features/customer-auth/dummy";
 import "@/features/contact/dummy";
+import "@/features/storefront/dummy";
+import "@/features/website-settings/dummy";
 
 /**
  * RTK Query base query that answers from the in-memory dummy backend instead of the network.
@@ -33,6 +36,7 @@ export const dummyBaseQuery: BaseQueryFn<string | ApiRequest, unknown, ApiError>
     const match = matchRoute(method, req.url);
     if (!match) throw new ApiHttpError(404, "route_not_found", `No dummy route for ${method} ${req.url}`);
     const data = await match.route.handler({ params: match.params, query: req.params ?? {}, body: req.body });
+    if (method !== "GET") db.flush();
     // A real backend returns copies. RTK Query freezes whatever it caches, so handing out the live in-memory
     // records would make them read-only for later mutations; clone at the boundary instead.
     return { data: structuredClone(data) };

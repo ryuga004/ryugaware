@@ -42,6 +42,8 @@ export const TAG_TYPES = [
   "StorageConfig",
   "AuthConfig",
   "ContactDetails",
+  "SiteContent",
+  "StoreSettings",
 ] as const;
 export type TagType = (typeof TAG_TYPES)[number];
 

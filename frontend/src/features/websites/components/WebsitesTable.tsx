@@ -1,4 +1,4 @@
-import { ArrowUpRight, Ellipsis, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpRight, SquarePen, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { ActionMenu } from "@/components/platform/ActionMenu";
 import { DataTable, type Column } from "@/components/platform/DataTable";
 import { TemplateShot } from "@/components/platform/TemplateShot";
@@ -14,13 +14,13 @@ export function WebsitesTable({
   loading,
   onEdit,
   onDelete,
-  onOpenAdmin,
+  onOpenEditor,
 }: {
   rows: Website[] | undefined;
   loading?: boolean;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  onOpenAdmin: (website: Website) => void;
+  onOpenEditor: (website: Website) => void;
 }) {
   const columns: Column<Website>[] = [
     {
@@ -54,7 +54,8 @@ export function WebsitesTable({
             </IconButton>
           }
           items={[
-            { key: "admin", label: "Open admin", icon: <ArrowUpRight className="size-4 text-muted" />, onSelect: () => onOpenAdmin(w) },
+            { key: "editor", label: "Edit website", icon: <SquarePen className="size-4 text-muted" />, onSelect: () => onOpenEditor(w) },
+            { key: "preview", label: "Preview website", icon: <ArrowUpRight className="size-4 text-muted" />, href: `/sites/${w.subdomain}` },
             { key: "edit", label: "Edit details", icon: <Pencil className="size-4 text-muted" />, onSelect: () => onEdit(w.id) },
             { key: "delete", label: "Delete website", icon: <Trash2 className="size-4" />, tone: "danger", separated: true, onSelect: () => onDelete(w.id) },
           ]}

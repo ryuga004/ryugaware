@@ -1,7 +1,8 @@
-import { ArrowUpRight, ExternalLink, Globe, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, Globe, Loader2, Pencil, SquarePen, Trash2 } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TemplateShot } from "@/components/platform/TemplateShot";
+import { supportsEditor } from "@/features/storefront/templates";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
 import { TYPE_LABEL } from "../constants";
@@ -12,15 +13,16 @@ export function WebsiteCard({
   website,
   onEdit,
   onDelete,
-  onOpenAdmin,
+  onOpenEditor,
   deleting,
 }: {
   website: Website;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  onOpenAdmin: (website: Website) => void;
+  onOpenEditor: (website: Website) => void;
   deleting?: boolean;
 }) {
+  const editable = supportsEditor(website.templateId, website.type);
   const draft = website.status === "draft";
   const host = website.customDomain ?? website.url.replace("https://", "");
   const meta = website.lastPublishedAt ? `Last published ${formatDate(website.lastPublishedAt)}` : `Created ${formatDate(website.createdAt)}`;
@@ -49,13 +51,31 @@ export function WebsiteCard({
           )}
         </div>
         <p className="text-xs text-muted">
-          {TYPE_LABEL[website.type]} · {meta}
+          {TYPE_LABEL[website.type]} · {website.templateName} · {meta}
         </p>
       </div>
       <div className="flex items-center justify-between border-t border-line px-5 py-3">
-        <Button variant="secondary" size="sm" rightIcon={<ArrowUpRight className="size-4" />} onClick={() => onOpenAdmin(website)}>
-          Open admin
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<SquarePen className="size-4" />}
+            onClick={() => onOpenEditor(website)}
+            disabled={!editable}
+            title={editable ? undefined : `${website.templateName} does not support the website editor yet.`}
+          >
+            Edit website
+          </Button>
+          <a
+            href={`/sites/${website.subdomain}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-ink-700 transition-colors hover:bg-subtle"
+          >
+            Preview
+            <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        </div>
         <div className="flex items-center gap-1">
           <IconButton label={`Edit ${website.name}`} onClick={() => onEdit(website.id)} disabled={deleting}>
             <Pencil className="size-4" />

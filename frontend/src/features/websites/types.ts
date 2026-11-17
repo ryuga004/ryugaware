@@ -18,6 +18,8 @@ export interface Website {
   createdAt: string;
   updatedAt: string;
   lastPublishedAt: string | null;
+  /** Where this website's media lives. Defaults to the organisation's connected bucket. */
+  storage?: "platform" | "connected";
 }
 
 export interface WebsiteFilters {
@@ -41,11 +43,22 @@ export interface CreateWebsiteInput {
   name: string;
   subdomain: string;
   templateId: string;
+  /** Branding and structure chosen in the create-website wizard, applied to the new content. */
+  description?: string;
+  brandName?: string;
+  logo?: string | null;
+  primary?: string;
+  secondary?: string;
+  fontPair?: "serif" | "sans";
+  /** Page keys the customer switched off before creating. Required pages are kept regardless. */
+  disabledPages?: string[];
 }
 
 export interface UpdateWebsiteInput {
   name?: string;
   paused?: boolean;
+  /** Publishing makes the website live and stamps `lastPublishedAt`. */
+  publish?: boolean;
 }
 
 export interface SubdomainCheck {

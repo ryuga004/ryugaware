@@ -31,6 +31,8 @@ Only the **generic** marks below are generated.
 | Empty states | `empty/authentication.svg` | 480 x 480 | Authentication, nothing enabled |
 | Empty states | `empty/contact.svg` | 480 x 480 | Contact details, not set up |
 | Empty states | `empty/no-results.svg` | 480 x 480 | Any table, filters matched nothing |
+| Status pages | `empty/not-found.svg` | 480 x 480 | 404 page (`app/not-found.tsx`) |
+| Status pages | `empty/unavailable.svg` | 480 x 480 | Temporarily unavailable (`app/error.tsx`, `app/global-error.tsx`) |
 | Payment marks | `payments/card.svg`, `upi.svg`, `netbanking.svg`, `wallet.svg`, `cod.svg` | 96 x 64 | Payment method rows, checkout |
 | Delivery marks | `delivery/standard.svg`, `express.svg`, `same-day.svg`, `pickup.svg` | 96 x 64 | Delivery method rows |
 | Carriers | `carriers/local.svg`, `carriers/self.svg` | 96 x 64 | Generic carrier fallbacks |
@@ -101,6 +103,19 @@ Create one PNG board "map-placeholder" 744x200: a flat, abstract street map with
 ```text
 Create twelve boards a1..a12, each 128x128, circular crop (the artwork fills a circle, transparent outside). They are abstract avatars, NOT faces and NOT people: flat geometric compositions only. Each uses two or three colours taken from this set: Ink #14100F, Ink-800 #2A2321, Cream #FAF4EC, Cream-2 #F3ECE2, Ember #F0502D (small area only), Ember-glow #FF8F63, rose #D9AEB7, sage #9CC795, sand #D6C7B2, slate #8CA69E.
 Use a mix of simple shapes: half circle on a solid ground, two overlapping circles, stacked arcs, a diagonal split, concentric rings, a quarter circle in a corner. All twelve must feel like one family but look clearly different. No text, no initials.
+```
+
+## Prompt 15: Status-page illustrations (two SVG boards)
+
+Same family as prompt 9 — they sit on the whole-page 404 and "temporarily unavailable" screens, so they must look like
+the empty states, not like a separate set.
+
+```text
+Create two SVG boards, 480x480 each, transparent background, using the shared structure from prompt 9: two concentric thin circle outlines (1.5px, #E2D6C6; diameters 360 and 264) centred on the board; in the centre a rounded-square tile 120x120 (radius 28) filled Ink #14100F; inside the tile ONE line icon, Lucide style, 3px stroke, colour Ember-glow #FF8F63, 56px; one small solid Ember #F0502D dot (28px) sitting on the outer ring at the top-right (about 45 degrees). No text, no shadows, no gradients.
+The icon on each board:
+1. not-found: a compass (a circle with a four-point needle inside), for "we can't find that page".
+2. unavailable: a clock (a circle with an hour and a minute hand), for "temporarily unavailable, back shortly".
+Name the boards not-found and unavailable.
 ```
 
 ---

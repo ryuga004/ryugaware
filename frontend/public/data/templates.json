@@ -1,6 +1,33 @@
 {
   "data": [
     {
+      "id": "tpl_aurelia_commerce",
+      "slug": "aurelia-commerce",
+      "name": "Aurelia Commerce",
+      "category": "ecommerce",
+      "description": "A complete online store: editable landing page, catalogue with search and filters, product pages with variants, cart, checkout, order confirmation and tracking.",
+      "pages": 9,
+      "features": [
+        "Editable landing page",
+        "Search, filters & sorting",
+        "Variants & stock",
+        "Cart & checkout",
+        "Order tracking",
+        "Customer reviews"
+      ],
+      "paymentMethods": [
+        "Cash on delivery",
+        "UPI",
+        "Cards"
+      ],
+      "thumbnailTheme": "aurelia_commerce",
+      "previewUrl": "/sites/preview",
+      "version": "1.0.0",
+      "status": "published",
+      "createdAt": "2026-11-01T10:00:00Z",
+      "updatedAt": "2026-11-13T10:00:00Z"
+    },
+    {
       "id": "tpl_classic_store",
       "slug": "classic-store",
       "name": "Classic Store",

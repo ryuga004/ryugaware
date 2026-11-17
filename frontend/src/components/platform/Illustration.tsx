@@ -7,6 +7,8 @@ export type IllustrationName =
   | "templates"
   | "error"
   | "no-results"
+  | "not-found"
+  | "unavailable"
   | "storage"
   | "domains"
   | "payments"

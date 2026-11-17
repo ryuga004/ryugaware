@@ -15,6 +15,9 @@ import { db } from "@/lib/api/dummy/db";
 import { registerRoutes } from "@/lib/api/dummy/router";
 import { newId, nowIso, num, paginate, str } from "@/lib/api/dummy/utils";
 import type { Template } from "@/features/templates/types";
+import { instantiateSite } from "@/features/storefront/instantiate";
+import { getTemplate } from "@/features/storefront/templates";
+import type { SiteContent } from "@/features/storefront/types";
 import type {
   CreateWebsiteInput,
   SubdomainCheck,
@@ -146,6 +149,25 @@ registerRoutes([
         lastPublishedAt: null,
       };
       items.unshift(created);
+
+      // Creating a website means copying the template's default content into it. Everything the
+      // customer edits from now on is their own copy — no template or other website is touched.
+      if (getTemplate(created.templateId)) {
+        const content = instantiateSite({
+          websiteId: created.id,
+          templateId: created.templateId,
+          brandName: input.brandName?.trim() || name,
+          brandDescription: input.description,
+          logo: input.logo ?? null,
+          primary: input.primary,
+          secondary: input.secondary,
+          fontPair: input.fontPair,
+          disabledPages: input.disabledPages,
+          now,
+        });
+        (await db.collection<SiteContent>("site-content")).push(content);
+      }
+
       return { data: created };
     },
   },
@@ -165,6 +187,10 @@ registerRoutes([
       if (input.paused !== undefined) {
         site.status = input.paused ? "paused" : site.lastPublishedAt ? "live" : "draft";
       }
+      if (input.publish) {
+        site.status = "live";
+        site.lastPublishedAt = nowIso();
+      }
       site.updatedAt = nowIso();
       return { data: site };
     },
@@ -177,6 +203,10 @@ registerRoutes([
       const index = items.findIndex((w) => w.id === params.id);
       if (index < 0) throw notFound("Website");
       const [removed] = items.splice(index, 1);
+      // The website's pages and theme go with it; nothing is shared with other websites.
+      const contents = await db.collection<SiteContent>("site-content");
+      const contentIndex = contents.findIndex((c) => c.websiteId === removed.id);
+      if (contentIndex >= 0) contents.splice(contentIndex, 1);
       return { data: { id: removed.id, name: removed.name, deleted: true } };
     },
   },

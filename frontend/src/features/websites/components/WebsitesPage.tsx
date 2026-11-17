@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { LayoutGrid, Plus, Rows3 } from "lucide-react";
 import Link from "next/link";
 import { Alert } from "@/components/platform/Alert";
@@ -10,18 +11,16 @@ import { FilterSelect } from "@/components/platform/FilterSelect";
 import { PageHeader } from "@/components/platform/PageHeader";
 import { Pagination } from "@/components/platform/Pagination";
 import { SearchInput } from "@/components/platform/SearchInput";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useGetLicenseQuery } from "@/features/account/api";
 import { selectLicense, selectLimitReached } from "@/features/account/slice";
-import { pushToast } from "@/features/ui/slice";
 import { cn } from "@/lib/cn";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useGetWebsitesQuery } from "../api";
 import { PAGE_SIZE_OPTIONS, STATUS_OPTIONS, TYPE_OPTIONS } from "../constants";
 import {
   clearFilters,
-  openCreateDrawer,
   openEditDrawer,
   requestDelete,
   selectHasActiveFilters,
@@ -41,6 +40,7 @@ import { WebsitesTable } from "./WebsitesTable";
 
 export function WebsitesPage() {
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const filters = useAppSelector(selectWebsiteFilters);
   const view = useAppSelector(selectWebsitesView);
   const hasFilters = useAppSelector(selectHasActiveFilters);
@@ -54,25 +54,23 @@ export function WebsitesPage() {
   const onSearch = useCallback((v: string) => dispatch(setSearch(v)), [dispatch]);
   const onEdit = useCallback((id: string) => dispatch(openEditDrawer(id)), [dispatch]);
   const onDelete = useCallback((id: string) => dispatch(requestDelete(id)), [dispatch]);
-  const onOpenAdmin = useCallback(
-    (w: Website) => dispatch(pushToast({ tone: "info", title: `Admin for ${w.name}`, description: "The per-website admin panel is the next phase." })),
-    [dispatch],
-  );
+  const onOpenEditor = useCallback((w: Website) => router.push(`/websites/${w.id}/editor`), [router]);
 
   const websites = data?.data;
   const totalAll = data?.meta.counts.all ?? 0;
   const noWebsitesAtAll = !isLoading && !isError && totalAll === 0 && !hasFilters;
   const noResults = !isLoading && !isError && websites?.length === 0 && hasFilters;
 
-  const newButton = (
-    <Button
-      leftIcon={<Plus className="size-4" />}
-      onClick={() => dispatch(openCreateDrawer())}
-      disabled={limitReached}
-      title={limitReached ? "Your license includes no more websites. Delete a website to create a new one." : undefined}
-    >
+  // Creating now starts in the template gallery; the drawer stays for renaming an existing website.
+  const newButton = limitReached ? (
+    <Button leftIcon={<Plus className="size-4" />} disabled title="Your license includes no more websites. Delete a website to create a new one.">
       New website
     </Button>
+  ) : (
+    <ButtonLink href="/websites/new">
+      <Plus className="size-4" aria-hidden />
+      New website
+    </ButtonLink>
   );
 
   return (
@@ -92,9 +90,10 @@ export function WebsitesPage() {
           description="Start from a ready-made template. You can change everything later."
           actions={
             <>
-              <Button leftIcon={<Plus className="size-4" />} onClick={() => dispatch(openCreateDrawer())}>
+              <ButtonLink href="/websites/new">
+                <Plus className="size-4" aria-hidden />
                 New website
-              </Button>
+              </ButtonLink>
               <Link href="/templates" className="inline-flex h-9 items-center justify-center rounded-md border border-line-strong bg-surface px-3.5 text-sm font-medium hover:bg-subtle">
                 Browse templates
               </Link>
@@ -152,11 +151,11 @@ export function WebsitesPage() {
                   {isLoading
                     ? Array.from({ length: filters.pageSize > 6 ? 6 : filters.pageSize }, (_, i) => <WebsiteCardSkeleton key={i} />)
                     : websites?.map((w) => (
-                        <WebsiteCard key={w.id} website={w} onEdit={onEdit} onDelete={onDelete} onOpenAdmin={onOpenAdmin} deleting={pendingDeleteId === w.id} />
+                        <WebsiteCard key={w.id} website={w} onEdit={onEdit} onDelete={onDelete} onOpenEditor={onOpenEditor} deleting={pendingDeleteId === w.id} />
                       ))}
                 </div>
               ) : (
-                <WebsitesTable rows={websites} loading={isLoading} onEdit={onEdit} onDelete={onDelete} onOpenAdmin={onOpenAdmin} />
+                <WebsitesTable rows={websites} loading={isLoading} onEdit={onEdit} onDelete={onDelete} onOpenEditor={onOpenEditor} />
               )}
             </div>
           )}

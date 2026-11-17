@@ -53,6 +53,38 @@
   --animate-sheet-in: sheet-in 200ms ease-out;
 }
 
+/*
+ * Storefront template tokens (`sf-*`).
+ *
+ * These belong to the customer-facing website templates, NOT to the platform admin: a template is
+ * free to look nothing like Ryugaware (cool neutrals, serif display, sharp corners), and DESIGN.md
+ * does not govern it. Never use an `sf-*` token in admin UI, or a platform token inside a template.
+ *
+ * Per-website branding overrides `--color-sf-primary` / `--color-sf-secondary` (and the font vars)
+ * inline on the storefront root element, so one shared template renders every customer's colours.
+ */
+@theme {
+  --color-sf-paper: #ffffff;
+  --color-sf-canvas: #f4f5f3;
+  --color-sf-ink: #141a17;
+  --color-sf-body: #3c443f;
+  --color-sf-muted: #6b746e;
+  --color-sf-faint: #9aa29c;
+  --color-sf-line: #e3e6e2;
+  --color-sf-dark: #141a17;
+  --color-sf-on-dark: #c8d0ca;
+  --color-sf-primary: #17352f;
+  --color-sf-secondary: #c08a4e;
+  --color-sf-sale: #b0372c;
+  --color-sf-ok: #2f6b4f;
+
+  --font-sf-display: var(--font-playfair), ui-serif, Georgia, serif;
+  --font-sf-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sf: 2px;
+  --radius-sf-lg: 4px;
+}
+
 @keyframes drawer-in {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }

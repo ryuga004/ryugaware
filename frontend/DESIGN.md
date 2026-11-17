@@ -84,7 +84,8 @@ Scale (do not invent sizes):
 - `Button` variants: `primary` (one per view area, the main action), `secondary` (bordered alternative), `ghost` (tertiary / Reset), `danger` (confirming a destructive action), `dangerGhost` (destructive entry point in menus/rows). Sizes `sm` 32px / `md` 36px (default) / `lg` 44px (auth and marketing). Use `loading`, `leftIcon`, `rightIcon` instead of hand-rolled spinners.
 - `IconButton` for icon-only actions: `label` is required (accessible name + tooltip).
 - `ButtonLink` for navigation that looks like a button (never a `<button>` that routes).
-- `Input` (`leftIcon`, `rightSlot`, `suffix`, `mono`, `invalid`), `Select`, `Checkbox`, `Switch`, `SegmentedControl`, `Badge`, `Avatar`, `Skeleton`, `Spinner`, `UsageBar`.
+- `Input` (`leftIcon`, `rightSlot`, `suffix`, `mono`, `invalid`), `Textarea`, `Select`, `Checkbox`, `Switch`, `SegmentedControl`,
+  `ColorInput` (swatch + hex), `Badge`, `Avatar`, `Skeleton`, `Spinner`, `UsageBar`.
 - Controls are 36px (`h-9`) by default, 44px (`h-11`) for large/auth forms; focus = `border-primary` + `ring-[3px] ring-ember/20`.
 
 **Platform patterns** (`src/components/platform/`)
@@ -104,6 +105,8 @@ Scale (do not invent sizes):
 | Transient feedback | `dispatch(pushToast({ tone, title, description? }))` |
 | Nothing yet / no results | `EmptyState` with `illustration` |
 | Load failure | `ErrorState` with `onRetry` |
+| Whole-page 404 / service unavailable | `StatusScreen` (wired up in `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`) |
+| Picture chosen by the customer (logo, section art) | `ImageUpload` |
 | Numbers | `StatTile` / `StatGrid`, charts from `Charts.tsx` (always with the table view) |
 
 Merge classes with `cn()` from `@/lib/cn`; components accept `className` for layout tweaks, not to restyle their colors.
@@ -131,6 +134,11 @@ Mutations: button `loading` while pending, success/error toast after, destructiv
 - Minimum touch target 32px (36px+ preferred on mobile).
 
 ## 8. Icons and imagery
+
+> **Storefront templates are exempt from this document.** Everything a customer's own website renders
+> (`src/features/storefront`) uses the separate `sf-*` tokens in `globals.css` and its own small UI kit
+> (`features/storefront/components/ui.tsx`). A template is meant to look like a shop, not like Ryugaware:
+> never use a platform component or token inside one, or an `sf-*` token in the admin.
 
 - Icons: `lucide-react` only. `size-4` in buttons and inputs, `size-[18px]` in nav and alerts, `size-5` for close buttons and tab bar. Color inherits (`text-muted`, active `text-primary` / `text-glow` on dark).
 - Images: `next/image` from `public/images/**` (WebP). `public/assets_images/` holds source exports and is **not** used at runtime.

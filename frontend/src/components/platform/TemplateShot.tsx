@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { ThemeThumbnail } from "./ThemeThumbnail";
 
 /** Themes that have a rendered homepage screenshot in public/images/templates. */
-const SHOTS = new Set(["classic_store", "modern_boutique", "fresh_market", "studio_pro", "clinic_care", "bistro_table"]);
+const SHOTS = new Set(["aurelia_commerce", "classic_store", "modern_boutique", "fresh_market", "studio_pro", "clinic_care", "bistro_table"]);
 
 /**
  * Template / website preview: the real homepage screenshot (cropped from the top) inside a box of the

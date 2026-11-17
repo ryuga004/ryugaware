@@ -61,7 +61,7 @@ export const websitesApi = baseApi.injectEndpoints({
               tone: "success",
               title: `${data.name} created`,
               description: data.url.replace("https://", ""),
-              action: { label: "Open admin", href: `/websites?admin=${data.id}` },
+              action: { label: "Open editor", href: `/websites/${data.id}/editor` },
             }),
           );
         } catch (e) {
