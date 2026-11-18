@@ -1,4 +1,4 @@
-/** Shared API contracts. Keep these identical when the dummy layer is replaced by a real backend. */
+/** Shared API contracts, matching the Go backend. */
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -35,6 +35,8 @@ export interface ApiErrorBody {
   message: string;
   /** Field-level validation messages keyed by form field name. */
   fieldErrors?: Record<string, string>;
+  /** Correlation id echoed by the backend, worth quoting in a support ticket. */
+  requestId?: string;
 }
 
 /** Shape of `error` returned by the base query (serializable). */

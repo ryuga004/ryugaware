@@ -10,7 +10,6 @@ import { FormField } from "@/components/platform/FormField";
 import { PasswordInput } from "@/components/platform/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { USE_DUMMY_API } from "@/lib/api/config";
 import { isApiError } from "@/lib/api/types";
 import { useLoginMutation } from "../api";
 import { safeNext } from "../utils";
@@ -34,10 +33,6 @@ export function LoginForm() {
       await login(values).unwrap();
       router.replace(next);
     } catch (e) {
-      if (isApiError(e) && e.data.code === "email_not_verified") {
-        router.replace(`/verify-email?email=${encodeURIComponent(values.email.trim().toLowerCase())}`);
-        return;
-      }
       setFormError(isApiError(e) ? e.data.message : "Something went wrong. Please try again.");
     }
   });
@@ -71,13 +66,6 @@ export function LoginForm() {
           Create one
         </Link>
       </AuthFooterLink>
-      {USE_DUMMY_API && (
-        <p className="mt-8 rounded-md border border-dashed border-line-strong p-3 text-xs text-muted">
-          Demo account: <code className="font-mono">priya@bloomstudio.com</code> / <code className="font-mono">Password1!</code>
-          <br />
-          Unverified account: <code className="font-mono">unverified@example.com</code>
-        </p>
-      )}
     </>
   );
 }

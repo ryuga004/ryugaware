@@ -4,6 +4,11 @@ Go modular monolith. Read `PROJECT_STATE.md` first — it is the source of truth
 what exists, what is wired, and what is left. Do not re-read the whole codebase to
 rebuild context; read the state file, then open only the files you are changing.
 
+The enforceable engineering detail lives in path-scoped rules in `.claude/rules/`
+(`backend-architecture`, `backend-multitenancy`, `backend-api`, `backend-persistence`,
+`backend-security`, `backend-testing`); they load automatically when a matching file is
+touched. This file keeps Rule 0 and the summary — do not duplicate the rules here.
+
 ---
 
 ## Rule 0 — Keep `PROJECT_STATE.md` current (mandatory)

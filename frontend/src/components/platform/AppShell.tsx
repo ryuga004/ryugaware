@@ -8,7 +8,6 @@ import { IconButton } from "@/components/ui/Button";
 import { setMobileNavOpen } from "@/features/ui/slice";
 import { cn } from "@/lib/cn";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { DemoDataSwitcher } from "./DemoDataSwitcher";
 import { Logo } from "./Logo";
 import { isActivePath, MOBILE_PRIMARY, NAV_GROUPS, NAV_ITEMS, titleForPath } from "./nav";
 import { PlatformOverlays } from "./PlatformOverlays";
@@ -63,7 +62,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="shrink-0 border-t border-ink-800 p-3">
-          <DemoDataSwitcher dark className="mb-3 hidden px-1 lg:flex" />
           <div className="hidden lg:block">
             <UserMenu variant="full" side="top" />
           </div>
@@ -146,7 +144,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </ul>
               </div>
             ))}
-            <DemoDataSwitcher className="mt-5 border-t border-line pt-4" />
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

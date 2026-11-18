@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { StorageConfig } from "./types";
 
-/** S3 bucket naming rules. Returns the first broken rule, or null. Shared by the form and the dummy backend. */
+/** S3 bucket naming rules. Returns the first broken rule, or null. Shared by the form and the backend. */
 export function bucketNameError(name: string): string | null {
   if (!name) return "Enter the bucket name.";
   if (name.length < 3 || name.length > 63) return "Bucket names are 3 to 63 characters long.";

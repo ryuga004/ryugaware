@@ -3,7 +3,7 @@ import { AppShell } from "@/components/platform/AppShell";
 import { AuthGate, FullPageLoader } from "@/features/auth/components/AuthGate";
 
 /**
- * The signed-in area waits for a client-side session check (the dummy API lives in the browser), so its
+ * The signed-in area waits for a client-side session check against /auth/me, so its
  * first load cannot be instant. Navigating between pages inside it is: this layout stays mounted.
  */
 export const instant = false;

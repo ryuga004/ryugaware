@@ -1,18 +1,3 @@
-// Command migrate applies versioned SQL migrations to PostgreSQL.
-//
-// It is a separate binary from the API on purpose: schema changes are a
-// deployment step with their own failure mode and their own rollback, not
-// something that should happen implicitly when a replica boots. Running N API
-// replicas must not mean running N concurrent migrators.
-//
-// Usage:
-//
-//	migrate up              apply all pending migrations
-//	migrate down [n]        roll back n migrations (default 1)
-//	migrate drop            drop everything (refused outside development)
-//	migrate goto <version>  migrate to an exact version
-//	migrate force <version> mark a version as applied, clearing the dirty flag
-//	migrate version         print the current version
 package main
 
 import (
@@ -26,13 +11,12 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	pgxmigrate "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx/v5" database/sql driver
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/ryuga/ryugaware/backend/internal/config"
 	"github.com/ryuga/ryugaware/backend/migrations"
 )
 
-// migrationsTable is where golang-migrate records the applied version.
 const migrationsTable = "schema_migrations"
 
 func main() {
@@ -71,8 +55,7 @@ func run(args []string) error {
 		}
 		err = m.Steps(-n)
 	case "drop":
-		// Dropping every table is unrecoverable, so it is gated on the
-		// environment rather than on a flag someone can paste into prod.
+
 		if cfg.App.Env != config.EnvDevelopment && cfg.App.Env != config.EnvTest {
 			return fmt.Errorf("drop refused: APP_ENV is %q, expected development or test", cfg.App.Env)
 		}
@@ -110,8 +93,6 @@ func run(args []string) error {
 		return fmt.Errorf("unknown command %q", cmd)
 	}
 
-	// "No change" is the expected outcome of re-running `up`, which every
-	// deployment does. Treating it as success keeps pipelines idempotent.
 	if errors.Is(err, migrate.ErrNoChange) {
 		fmt.Println("no change")
 		return nil
@@ -128,7 +109,6 @@ func run(args []string) error {
 	return nil
 }
 
-// open wires the embedded source and the pgx database driver together.
 func open(cfg *config.Config) (*migrate.Migrate, func(), error) {
 	src, err := iofs.New(migrations.FS, ".")
 	if err != nil {
@@ -140,9 +120,6 @@ func open(cfg *config.Config) (*migrate.Migrate, func(), error) {
 		return nil, nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	// Wait for the database rather than failing instantly: in Compose and in
-	// most CD pipelines the migrator starts the moment the container is up,
-	// which is a little before Postgres accepts connections.
 	if err := waitForDB(db, 30*time.Second); err != nil {
 		_ = db.Close()
 		return nil, nil, err
@@ -151,8 +128,7 @@ func open(cfg *config.Config) (*migrate.Migrate, func(), error) {
 	driver, err := pgxmigrate.WithInstance(db, &pgxmigrate.Config{
 		MigrationsTable: migrationsTable,
 		DatabaseName:    cfg.Postgres.Database,
-		// Without this, a migration that acquires a lock can hang a deploy
-		// indefinitely instead of failing and alerting.
+
 		StatementTimeout: 5 * time.Minute,
 	})
 	if err != nil {

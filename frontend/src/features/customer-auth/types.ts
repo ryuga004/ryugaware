@@ -72,7 +72,7 @@ export interface GoogleTestResult {
   testedAt: string;
 }
 
-/** Stored settings (public/data/customer-auth.json): the raw secret never leaves the dummy backend. */
+/** Stored settings: the raw secret never leaves the backend. */
 export interface StoredAuthSettings extends Omit<AuthSettings, "google"> {
   google: Omit<GoogleAuthSettings, "clientSecretHint"> & { clientSecret: string | null };
 }

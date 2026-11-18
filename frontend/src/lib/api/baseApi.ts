@@ -1,25 +1,78 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import type { BaseQueryFn } from "@reduxjs/toolkit/query";
-import { API_URL, USE_DUMMY_API } from "./config";
-import { dummyBaseQuery } from "./dummy/baseQuery";
+import type { BaseQueryApi, BaseQueryFn } from "@reduxjs/toolkit/query";
+import { API_URL } from "./config";
 import type { ApiError, ApiRequest } from "./types";
 
-/**
- * Real backend adapter: same arguments as the dummy query. `fetchBaseQuery` already understands
- * `{ url, method, params, body }`, and we normalise failures into the shared `ApiError` shape.
- */
-const httpBaseQuery: BaseQueryFn<string | ApiRequest, unknown, ApiError> = async (args, api, extra) => {
-  const raw = fetchBaseQuery({ baseUrl: API_URL, credentials: "include" });
-  const result = await raw(args as Parameters<typeof raw>[0], api, extra);
-  if (!result.error) return { data: result.data, meta: result.meta };
-  const status = typeof result.error.status === "number" ? result.error.status : 0;
-  const body = (result.error as { data?: Partial<ApiError["data"]> }).data;
+/** RFC 9457 problem document returned by the Go backend. */
+interface ProblemDocument {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  code?: string;
+  errors?: { field?: string; pointer?: string; detail?: string }[];
+  request_id?: string;
+}
+
+/** Normalises a problem document into the flat shape every form in the app already reads. */
+function toApiError(status: number, body: unknown): ApiError {
+  const problem = (body ?? {}) as ProblemDocument;
+  const fieldErrors = problem.errors?.reduce<Record<string, string>>((acc, e) => {
+    const field = e.field ?? e.pointer?.replace(/^\//, "");
+    if (field && e.detail) acc[field] = e.detail;
+    return acc;
+  }, {});
+
   return {
-    error: {
-      status,
-      data: { code: body?.code ?? "request_failed", message: body?.message ?? "Request failed.", fieldErrors: body?.fieldErrors },
+    status,
+    data: {
+      code: problem.code ?? "request_failed",
+      message: problem.detail ?? problem.title ?? "Request failed.",
+      fieldErrors: fieldErrors && Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined,
+      requestId: problem.request_id,
     },
   };
+}
+
+const rawQuery = fetchBaseQuery({ baseUrl: API_URL, credentials: "include" });
+
+/** Endpoints that must never trigger a refresh-and-retry: they define the session themselves. */
+const SESSION_ENDPOINTS = ["/auth/sessions", "/auth/tokens/refresh", "/auth/me"];
+
+const urlOf = (args: string | ApiRequest) => (typeof args === "string" ? args : args.url);
+
+/** Shared so N parallel 401s cause one refresh, not N. */
+let refreshing: Promise<boolean> | null = null;
+
+async function refreshSession(api: BaseQueryApi, extra: object): Promise<boolean> {
+  refreshing ??= (async () => {
+    const result = await rawQuery({ url: "/auth/tokens/refresh", method: "POST" }, api, extra);
+    return !result.error;
+  })().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+/**
+ * Real backend adapter. Failures become the shared `ApiError` shape, and a 401 on a normal
+ * endpoint is retried once behind a silent token refresh so a short access-token TTL is invisible.
+ */
+const httpBaseQuery: BaseQueryFn<string | ApiRequest, unknown, ApiError> = async (args, api, extra) => {
+  let result = await rawQuery(args as Parameters<typeof rawQuery>[0], api, extra);
+
+  const status = typeof result.error?.status === "number" ? result.error.status : 0;
+  if (status === 401 && !SESSION_ENDPOINTS.includes(urlOf(args))) {
+    if (await refreshSession(api, extra)) {
+      result = await rawQuery(args as Parameters<typeof rawQuery>[0], api, extra);
+    }
+  }
+
+  if (!result.error) return { data: result.data, meta: result.meta };
+
+  const finalStatus = typeof result.error.status === "number" ? result.error.status : 0;
+  return { error: toApiError(finalStatus, (result.error as { data?: unknown }).data) };
 };
 
 export const TAG_TYPES = [
@@ -53,7 +106,7 @@ export type TagType = (typeof TAG_TYPES)[number];
  */
 export const baseApi = createApi({
   reducerPath: "api",
-  baseQuery: USE_DUMMY_API ? dummyBaseQuery : httpBaseQuery,
+  baseQuery: httpBaseQuery,
   tagTypes: [...TAG_TYPES],
   keepUnusedDataFor: 120,
   refetchOnReconnect: true,

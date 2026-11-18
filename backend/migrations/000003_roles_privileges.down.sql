@@ -1,3 +1,0 @@
-DROP TABLE IF EXISTS role_privileges;
-DROP TABLE IF EXISTS privileges;
-DROP TABLE IF EXISTS roles;

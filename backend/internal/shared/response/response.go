@@ -1,8 +1,3 @@
-// Package response renders every HTTP response this API produces.
-//
-// Keeping serialisation in one place is what makes "consistent error
-// responses" true rather than aspirational: handlers call Error(c, err) and
-// the status code, payload shape and logging all follow from the error value.
 package response
 
 import (
@@ -16,70 +11,72 @@ import (
 	"github.com/ryuga/ryugaware/backend/internal/shared/apperrors"
 )
 
-// RequestIDKey is the gin context key holding the current request id.
-// It is set by middleware.RequestID and echoed in error payloads so a user can
-// quote it in a support ticket.
 const RequestIDKey = "request_id"
 
-// Body is the success envelope. Every 2xx payload is wrapped so clients can
-// tell data from metadata without guessing.
 type Body struct {
-	Data any   `json:"data"`
-	Meta *Meta `json:"meta,omitempty"`
+	Data any `json:"data"`
+	Meta any `json:"meta,omitempty"`
 }
 
-// Meta carries pagination information for list endpoints.
-type Meta struct {
+type CursorMeta struct {
+	NextCursor string `json:"next_cursor,omitempty"`
+	HasMore    bool   `json:"has_more"`
+	PageSize   int    `json:"page_size"`
+}
+
+type PageMeta struct {
 	Page       int   `json:"page"`
 	PageSize   int   `json:"page_size"`
 	TotalItems int64 `json:"total_items"`
 	TotalPages int   `json:"total_pages"`
 }
 
-// ErrorBody is the failure envelope.
-type ErrorBody struct {
-	Error ErrorPayload `json:"error"`
+const ProblemContentType = "application/problem+json; charset=utf-8"
+
+const problemTypeBase = "/problems/"
+
+type Problem struct {
+	Type     string `json:"type"`
+	Title    string `json:"title"`
+	Status   int    `json:"status"`
+	Detail   string `json:"detail,omitempty"`
+	Instance string `json:"instance,omitempty"`
+
+	Code      string         `json:"code"`
+	Errors    []InvalidParam `json:"errors,omitempty"`
+	RequestID string         `json:"request_id,omitempty"`
 }
 
-// ErrorPayload is the client-facing description of a failure.
-type ErrorPayload struct {
-	Code      string                 `json:"code"`
-	Message   string                 `json:"message"`
-	Details   []apperrors.FieldError `json:"details,omitempty"`
-	RequestID string                 `json:"request_id,omitempty"`
+type InvalidParam struct {
+	Field   string `json:"field"`
+	Pointer string `json:"pointer"`
+	Detail  string `json:"detail"`
 }
 
-// NewMeta computes pagination metadata.
-func NewMeta(page, pageSize int, total int64) *Meta {
+func NewPageMeta(page, pageSize int, total int64) *PageMeta {
 	if pageSize < 1 {
 		pageSize = 1
 	}
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
-	return &Meta{Page: page, PageSize: pageSize, TotalItems: total, TotalPages: totalPages}
+	return &PageMeta{Page: page, PageSize: pageSize, TotalItems: total, TotalPages: totalPages}
 }
 
-// OK writes 200 with a data envelope.
+func NewCursorMeta(nextCursor string, pageSize int) *CursorMeta {
+	return &CursorMeta{NextCursor: nextCursor, HasMore: nextCursor != "", PageSize: pageSize}
+}
+
 func OK(c *gin.Context, data any) { c.JSON(http.StatusOK, Body{Data: data}) }
 
-// Created writes 201 with a data envelope.
 func Created(c *gin.Context, data any) { c.JSON(http.StatusCreated, Body{Data: data}) }
 
-// Accepted writes 202, for work handed to a background worker.
 func Accepted(c *gin.Context, data any) { c.JSON(http.StatusAccepted, Body{Data: data}) }
 
-// NoContent writes 204.
 func NoContent(c *gin.Context) { c.Status(http.StatusNoContent) }
 
-// List writes 200 with items and pagination metadata.
-func List(c *gin.Context, items any, meta *Meta) {
+func List(c *gin.Context, items any, meta any) {
 	c.JSON(http.StatusOK, Body{Data: items, Meta: meta})
 }
 
-// Error translates err into an HTTP response.
-//
-// This is the only place internal errors are turned into client output, and
-// the only place server-side failures are logged, so neither can be forgotten
-// at a call site.
 func Error(c *gin.Context, err error) {
 	appErr := apperrors.From(err)
 	if appErr == nil {
@@ -90,10 +87,7 @@ func Error(c *gin.Context, err error) {
 	requestID, _ := c.Get(RequestIDKey)
 	reqID, _ := requestID.(string)
 
-	// Record the error on the gin context so access logging can report it,
-	// and log the full chain (including the cause) for 5xx responses only:
-	// client mistakes are not operator problems.
-	_ = c.Error(err) //nolint:errcheck // gin only fails on a nil error
+	_ = c.Error(err) //nolint:errcheck
 
 	if status >= http.StatusInternalServerError {
 		logger.FromContext(c.Request.Context(), nil).Error("request failed",
@@ -103,10 +97,35 @@ func Error(c *gin.Context, err error) {
 		)
 	}
 
-	c.AbortWithStatusJSON(status, ErrorBody{Error: ErrorPayload{
+	problem := Problem{
+		Type:      problemTypeBase + string(appErr.Code),
+		Title:     appErr.Title(),
+		Status:    status,
+		Detail:    appErr.Message,
 		Code:      string(appErr.Code),
-		Message:   appErr.Message,
-		Details:   appErr.Details,
+		Errors:    invalidParams(appErr.Details),
 		RequestID: reqID,
-	}})
+	}
+	if c.Request != nil && c.Request.URL != nil {
+		problem.Instance = c.Request.URL.Path
+	}
+
+	c.Abort()
+	c.Header("Content-Type", ProblemContentType)
+	c.JSON(status, problem)
+}
+
+func invalidParams(details []apperrors.FieldError) []InvalidParam {
+	if len(details) == 0 {
+		return nil
+	}
+	out := make([]InvalidParam, 0, len(details))
+	for _, d := range details {
+		out = append(out, InvalidParam{
+			Field:   d.Field,
+			Pointer: "/" + d.Field,
+			Detail:  d.Message,
+		})
+	}
+	return out
 }

@@ -32,13 +32,14 @@ export function ResetPasswordForm() {
 
   const onSubmit = handleSubmit(async ({ password }) => {
     try {
-      await resetPassword({ token, password }).unwrap();
+      await resetPassword({ token, newPassword: password }).unwrap();
     } catch (e) {
-      if (isApiError(e) && e.data.fieldErrors?.password) setError("password", { message: e.data.fieldErrors.password });
+      if (isApiError(e) && e.data.fieldErrors?.newPassword) setError("password", { message: e.data.fieldErrors.newPassword });
     }
   });
 
-  const linkProblem = !token || check?.valid === false || (isApiError(resetError) && (resetError.data.code === "link_expired" || resetError.data.code === "link_invalid"));
+  // The backend answers an unusable link with bad_request; a consumed one validates as false.
+  const linkProblem = !token || check?.valid === false || (isApiError(resetError) && resetError.data.code === "bad_request");
 
   if (isSuccess) {
     return (

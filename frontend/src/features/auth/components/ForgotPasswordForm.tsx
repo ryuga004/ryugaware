@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { FormField } from "@/components/platform/FormField";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { USE_DUMMY_API } from "@/lib/api/config";
 import { isApiError } from "@/lib/api/types";
 import { useAppSelector } from "@/store/hooks";
 import { useForgotPasswordMutation } from "../api";
@@ -58,12 +57,6 @@ export function ForgotPasswordForm() {
             <Link href="/login" className={`${authLinkClass} inline-flex items-center justify-center gap-1.5 text-sm`}>
               <ArrowLeft className="size-4" aria-hidden /> Back to sign in
             </Link>
-            {USE_DUMMY_API && (
-              <p className="rounded-md border border-dashed border-line-strong p-3 text-xs text-muted">
-                Demo: <Link href="/reset-password?token=valid-token" className={authLinkClass}>open the reset link</Link> ·{" "}
-                <Link href="/reset-password?token=expired-token" className={authLinkClass}>expired link</Link>
-              </p>
-            )}
           </>
         }
       >

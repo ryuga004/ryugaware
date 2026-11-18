@@ -1,9 +1,11 @@
 export interface AuthUser {
   id: string;
-  email: string;
   fullName: string;
-  organizationName: string;
-  emailVerified: boolean;
+  email: string;
+  orgName: string;
+  tenantId: string;
+  role: string;
+  privileges: string[];
 }
 
 export interface SessionInfo {
@@ -16,16 +18,21 @@ export interface LoginInput {
   password: string;
 }
 
-export interface RegisterInput {
+/** Details collected on the register screen, held until the email is verified. */
+export interface PendingRegistration {
+  orgName: string;
   fullName: string;
-  organizationName: string;
   email: string;
   password: string;
 }
 
+export interface RegisterInput extends PendingRegistration {
+  registrationToken: string;
+}
+
 export type AuthStatus = "unknown" | "authenticated" | "anonymous";
 
-/** Result of validating a one-time link token (email verification / password reset). */
+/** Result of validating a password-reset token. */
 export interface TokenCheck {
   valid: boolean;
 }

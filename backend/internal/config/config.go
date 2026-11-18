@@ -1,10 +1,3 @@
-// Package config owns all environment-driven configuration for the service.
-//
-// Configuration is read exactly once, at startup, by Load. Business modules
-// never read environment variables themselves; bootstrap injects the narrow
-// config struct each component actually needs. This keeps configuration
-// testable (construct the struct directly) and makes the full set of knobs
-// discoverable in one place.
 package config
 
 import (
@@ -18,7 +11,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Environment names recognised by the application.
 const (
 	EnvDevelopment = "development"
 	EnvTest        = "test"
@@ -26,7 +18,6 @@ const (
 	EnvProduction  = "production"
 )
 
-// Config is the fully validated application configuration.
 type Config struct {
 	App       App
 	HTTP      HTTP
@@ -39,24 +30,19 @@ type Config struct {
 	Messaging Messaging
 }
 
-// App holds process-wide settings.
 type App struct {
 	Name            string
 	Env             string
 	Version         string
 	ShutdownTimeout time.Duration
-	// PublicBaseURL is the externally reachable URL of the frontend. It is used
-	// to build links embedded in e-mails (verification, password reset).
+
 	PublicBaseURL string
 }
 
-// IsProduction reports whether the app runs with production safety rules.
 func (a App) IsProduction() bool { return a.Env == EnvProduction }
 
-// IsDevelopment reports whether the app runs in local development mode.
 func (a App) IsDevelopment() bool { return a.Env == EnvDevelopment }
 
-// HTTP holds the API server settings.
 type HTTP struct {
 	Host              string
 	Port              int
@@ -65,18 +51,15 @@ type HTTP struct {
 	WriteTimeout      time.Duration
 	IdleTimeout       time.Duration
 	MaxHeaderBytes    int
-	// TrustedProxies restricts which peers Gin will believe for X-Forwarded-For.
-	// Empty means "trust nobody", which is the safe default.
+
 	TrustedProxies []string
-	// BodyLimitBytes caps non-multipart request bodies.
+
 	BodyLimitBytes int64
 	CORS           CORS
 }
 
-// Addr returns the listen address for the HTTP server.
 func (h HTTP) Addr() string { return fmt.Sprintf("%s:%d", h.Host, h.Port) }
 
-// CORS holds cross-origin settings for browser clients.
 type CORS struct {
 	AllowedOrigins   []string
 	AllowedMethods   []string
@@ -86,7 +69,6 @@ type CORS struct {
 	MaxAge           time.Duration
 }
 
-// Postgres holds database connection and pool settings.
 type Postgres struct {
 	Host            string
 	Port            int
@@ -98,13 +80,12 @@ type Postgres struct {
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
 	ConnMaxIdleTime time.Duration
-	// SlowThreshold controls when GORM logs a query as slow.
+
 	SlowThreshold time.Duration
-	// StatementTimeout is applied per connection via the DSN.
+
 	StatementTimeout time.Duration
 }
 
-// DSN renders a libpq-style connection string.
 func (p Postgres) DSN() string {
 	parts := []string{
 		"host=" + p.Host,
@@ -120,7 +101,6 @@ func (p Postgres) DSN() string {
 	return strings.Join(parts, " ")
 }
 
-// URL renders a postgres:// URL, which is what golang-migrate expects.
 func (p Postgres) URL() string {
 	u := url.URL{
 		Scheme: "postgres",
@@ -134,7 +114,6 @@ func (p Postgres) URL() string {
 	return u.String()
 }
 
-// Redis holds cache and stream transport settings.
 type Redis struct {
 	Addr         string
 	Password     string
@@ -144,23 +123,18 @@ type Redis struct {
 	DialTimeout  time.Duration
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
-	// KeyPrefix namespaces every key this application writes.
+
 	KeyPrefix string
 }
 
-// Storage holds S3-compatible object storage settings.
 type Storage struct {
-	// Provider is "s3" (AWS, credentials from the default chain) or
-	// "minio" (static credentials + custom endpoint).
 	Provider  string
 	Region    string
 	Bucket    string
 	Endpoint  string
 	AccessKey string
 	SecretKey string
-	// PublicEndpoint overrides the host used in presigned URLs handed to
-	// clients. Inside Docker the API talks to "minio:9000", but a browser
-	// must be given "localhost:9000".
+
 	PublicEndpoint string
 	UsePathStyle   bool
 	PresignExpiry  time.Duration
@@ -168,17 +142,14 @@ type Storage struct {
 	AllowedMIME    []string
 }
 
-// IsMinIO reports whether the storage client targets a MinIO-compatible endpoint.
 func (s Storage) IsMinIO() bool { return s.Provider == "minio" }
 
-// TLS modes for the SMTP transport.
 const (
 	SMTPTLSNone     = "none"
 	SMTPTLSSTARTTLS = "starttls"
 	SMTPTLSImplicit = "tls"
 )
 
-// SMTP holds outbound mail transport settings.
 type SMTP struct {
 	Host        string
 	Port        int
@@ -186,71 +157,73 @@ type SMTP struct {
 	Password    string
 	FromAddress string
 	FromName    string
-	// TLSMode is one of none, starttls or tls.
+
 	TLSMode string
-	// InsecureSkipVerify disables certificate verification. Local only.
+
 	InsecureSkipVerify bool
 	Timeout            time.Duration
 }
 
-// Addr returns the SMTP dial address.
 func (s SMTP) Addr() string { return fmt.Sprintf("%s:%d", s.Host, s.Port) }
 
-// Log holds structured logging settings.
 type Log struct {
 	Level string
-	// Format is "json" or "text".
+
 	Format    string
 	AddSource bool
 }
 
-// Auth holds credentials, token and rate-limit policy for the auth module.
 type Auth struct {
-	JWTSecret            string
+	TokenHMACSecret      string
 	JWTIssuer            string
 	AccessTokenTTL       time.Duration
 	RefreshTokenTTL      time.Duration
 	BcryptCost           int
 	EmailVerificationTTL time.Duration
 	PasswordResetTTL     time.Duration
-	// MaxActiveSessions caps concurrent refresh tokens per user. 0 disables the cap.
+
+	OTPTTL               time.Duration
+	OTPMaxAttempts       int
+	OTPResendCooldown    time.Duration
+	OTPBlacklistTTL      time.Duration
+	RegistrationProofTTL time.Duration
+
+	CookieDomain string
+
 	MaxActiveSessions int
-	// LoginRateLimit allows N attempts per LoginRateWindow per IP+identifier.
+
 	LoginRateLimit  int
 	LoginRateWindow time.Duration
-	// RolesCacheTTL controls how long resolved roles are cached in Redis.
-	RolesCacheTTL time.Duration
-	// BootstrapAdminEmail, when set, is granted the admin role by migration seed.
-	BootstrapAdminEmail string
+
+	RolesCacheTTL     time.Duration
+	TenantKeyCacheTTL time.Duration
+
+	BootstrapAdminEmail    string
+	BootstrapAdminPassword string
+	BootstrapAdminName     string
 }
 
-// Messaging holds Redis Streams event-bus settings.
 type Messaging struct {
 	Stream    string
 	DLQStream string
-	// MaxLen approximately caps the stream length. 0 disables trimming.
+
 	MaxLen int64
-	// LiveChannel is the Pub/Sub channel used for ephemeral, droppable signals.
+
 	LiveChannel string
-	// Consumer defaults, applied to every worker unless overridden.
+
 	BatchSize     int64
 	BlockTimeout  time.Duration
 	MaxRetries    int64
 	ClaimMinIdle  time.Duration
 	ClaimInterval time.Duration
-	// HandlerTimeout bounds how long a single event handler may run.
+
 	HandlerTimeout time.Duration
-	// Enabled allows running the API with workers disabled (e.g. a web-only replica).
+
 	WorkersEnabled bool
 }
 
-// Load reads configuration from the process environment, optionally seeded by
-// a .env file, validates it and returns the typed result.
-//
-// Precedence: real environment variables always win over .env entries.
 func Load() (*Config, error) {
-	// godotenv.Load never overwrites variables that are already set, so a value
-	// exported by the shell or injected by the orchestrator takes precedence.
+
 	for _, f := range dotenvFiles() {
 		if _, err := os.Stat(f); err == nil {
 			if err := godotenv.Load(f); err != nil {
@@ -342,18 +315,27 @@ func Load() (*Config, error) {
 			AddSource: l.bool("LOG_ADD_SOURCE", false),
 		},
 		Auth: Auth{
-			JWTSecret:            l.str("AUTH_JWT_SECRET", ""),
-			JWTIssuer:            l.str("AUTH_JWT_ISSUER", "ryugaware"),
-			AccessTokenTTL:       l.duration("AUTH_ACCESS_TOKEN_TTL", 15*time.Minute),
-			RefreshTokenTTL:      l.duration("AUTH_REFRESH_TOKEN_TTL", 720*time.Hour),
-			BcryptCost:           l.int("AUTH_BCRYPT_COST", 12),
-			EmailVerificationTTL: l.duration("AUTH_EMAIL_VERIFICATION_TTL", 48*time.Hour),
-			PasswordResetTTL:     l.duration("AUTH_PASSWORD_RESET_TTL", time.Hour),
-			MaxActiveSessions:    l.int("AUTH_MAX_ACTIVE_SESSIONS", 10),
-			LoginRateLimit:       l.int("AUTH_LOGIN_RATE_LIMIT", 10),
-			LoginRateWindow:      l.duration("AUTH_LOGIN_RATE_WINDOW", time.Minute),
-			RolesCacheTTL:        l.duration("AUTH_ROLES_CACHE_TTL", 5*time.Minute),
-			BootstrapAdminEmail:  l.str("AUTH_BOOTSTRAP_ADMIN_EMAIL", ""),
+			TokenHMACSecret:        l.str("AUTH_TOKEN_HMAC_SECRET", ""),
+			JWTIssuer:              l.str("AUTH_JWT_ISSUER", "ryugaware"),
+			AccessTokenTTL:         l.duration("AUTH_ACCESS_TOKEN_TTL", 15*time.Minute),
+			RefreshTokenTTL:        l.duration("AUTH_REFRESH_TOKEN_TTL", 720*time.Hour),
+			BcryptCost:             l.int("AUTH_BCRYPT_COST", 12),
+			EmailVerificationTTL:   l.duration("AUTH_EMAIL_VERIFICATION_TTL", 48*time.Hour),
+			PasswordResetTTL:       l.duration("AUTH_PASSWORD_RESET_TTL", time.Hour),
+			MaxActiveSessions:      l.int("AUTH_MAX_ACTIVE_SESSIONS", 10),
+			LoginRateLimit:         l.int("AUTH_LOGIN_RATE_LIMIT", 10),
+			LoginRateWindow:        l.duration("AUTH_LOGIN_RATE_WINDOW", time.Minute),
+			RolesCacheTTL:          l.duration("AUTH_ROLES_CACHE_TTL", 5*time.Minute),
+			TenantKeyCacheTTL:      l.duration("AUTH_TENANT_KEY_CACHE_TTL", 5*time.Minute),
+			OTPTTL:                 l.duration("AUTH_OTP_TTL", 5*time.Minute),
+			OTPMaxAttempts:         l.int("AUTH_OTP_MAX_ATTEMPTS", 3),
+			OTPResendCooldown:      l.duration("AUTH_OTP_RESEND_COOLDOWN", time.Minute),
+			OTPBlacklistTTL:        l.duration("AUTH_OTP_BLACKLIST_TTL", 30*time.Minute),
+			RegistrationProofTTL:   l.duration("AUTH_REGISTRATION_PROOF_TTL", 3*time.Minute),
+			CookieDomain:           l.str("AUTH_COOKIE_DOMAIN", ""),
+			BootstrapAdminEmail:    l.str("AUTH_BOOTSTRAP_ADMIN_EMAIL", ""),
+			BootstrapAdminPassword: l.str("AUTH_BOOTSTRAP_ADMIN_PASSWORD", ""),
+			BootstrapAdminName:     l.str("AUTH_BOOTSTRAP_ADMIN_NAME", "Super admin"),
 		},
 		Messaging: Messaging{
 			Stream:         l.str("EVENTS_STREAM", "ryugaware:events:v1"),
@@ -379,7 +361,6 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// dotenvFiles returns the .env candidates to load, nearest-first.
 func dotenvFiles() []string {
 	if explicit := os.Getenv("ENV_FILE"); explicit != "" {
 		return []string{explicit}

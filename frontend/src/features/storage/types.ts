@@ -69,7 +69,7 @@ export interface StorageInput {
   forcePathStyle: boolean;
 }
 
-/** Stored document (public/data/storage.json). Holds the raw secret, which never leaves the dummy backend. */
+/** Stored document. Holds the raw secret, which never leaves the backend. */
 export interface StorageDocument extends Omit<StorageConfig, "secretHint"> {
   secretAccessKey: string | null;
 }

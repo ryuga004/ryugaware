@@ -1,17 +1,9 @@
 /**
  * API configuration.
  *
- * Set NEXT_PUBLIC_USE_DUMMY_API=false and NEXT_PUBLIC_API_URL to talk to a real backend.
- * Nothing else in the app needs to change: endpoints keep the same request/response contracts.
+ * Every request goes to the Go backend. Point NEXT_PUBLIC_API_URL at it; the default
+ * matches the local stack started by `backend/compose.yaml` plus `go run ./cmd/api`.
  */
-export const USE_DUMMY_API = process.env.NEXT_PUBLIC_USE_DUMMY_API !== "false";
-
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
-
-/** Artificial latency range for the dummy API (milliseconds). */
-export const DUMMY_LATENCY_MS: [number, number] = [
-  Number(process.env.NEXT_PUBLIC_DUMMY_LATENCY_MIN ?? 250),
-  Number(process.env.NEXT_PUBLIC_DUMMY_LATENCY_MAX ?? 600),
-];
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1";
 
 export const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "ryugaware.com";

@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS email_templates;
+DROP TABLE IF EXISTS outbox_events;
+DROP TABLE IF EXISTS platform_users;
+DROP TABLE IF EXISTS role_privileges;
+DROP TABLE IF EXISTS privileges;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS licenses;
+DROP TABLE IF EXISTS tenants;
+
+DROP EXTENSION IF EXISTS pgcrypto;
+DROP EXTENSION IF EXISTS citext;

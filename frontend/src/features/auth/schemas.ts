@@ -13,12 +13,20 @@ export type LoginValues = z.infer<typeof loginSchema>;
 
 export const registerSchema = z.object({
   fullName: z.string().trim().min(1, "Enter your full name.").max(80, "Use 80 characters or fewer."),
-  organizationName: z.string().trim().min(1, "Enter your organization name.").max(80, "Use 80 characters or fewer."),
+  orgName: z.string().trim().min(1, "Enter your organization name.").max(80, "Use 80 characters or fewer."),
   email,
   password: strongPassword,
   acceptTerms: z.boolean().refine((v) => v, { message: "Accept the Terms and Privacy Policy to continue." }),
 });
 export type RegisterValues = z.infer<typeof registerSchema>;
+
+export const otpSchema = z.object({
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your email."),
+});
+export type OtpValues = z.infer<typeof otpSchema>;
 
 export const forgotPasswordSchema = z.object({ email });
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;

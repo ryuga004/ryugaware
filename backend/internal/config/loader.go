@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// loader reads typed values from the environment, accumulating every parse
-// failure so a misconfigured deployment reports all of its problems at once
-// instead of one per restart.
 type loader struct {
 	problems []string
 }
@@ -26,7 +23,6 @@ func (l *loader) err() error {
 	return fmt.Errorf("config: %d invalid setting(s):\n  - %s", len(l.problems), strings.Join(l.problems, "\n  - "))
 }
 
-// lookup returns the trimmed value and whether it was set to something non-empty.
 func lookup(key string) (string, bool) {
 	v, ok := os.LookupEnv(key)
 	if !ok {
@@ -93,7 +89,6 @@ func (l *loader) bool(key string, def bool) bool {
 	return b
 }
 
-// duration accepts Go duration syntax ("30s", "1h30m").
 func (l *loader) duration(key string, def time.Duration) time.Duration {
 	v, ok := lookup(key)
 	if !ok {
@@ -111,7 +106,6 @@ func (l *loader) duration(key string, def time.Duration) time.Duration {
 	return d
 }
 
-// csv splits a comma-separated list, trimming blanks.
 func (l *loader) csv(key string, def []string) []string {
 	v, ok := lookup(key)
 	if !ok {
@@ -130,11 +124,8 @@ func (l *loader) csv(key string, def []string) []string {
 	return out
 }
 
-// minJWTSecretLen is the shortest HMAC key we accept outside development.
-const minJWTSecretLen = 32
+const minHMACSecretLen = 32
 
-// Validate enforces cross-field invariants and production safety rules.
-// It is called by Load, and is exported so tests can validate hand-built configs.
 func (c *Config) Validate() error {
 	v := &loader{}
 
@@ -175,8 +166,8 @@ func (c *Config) Validate() error {
 	if c.SMTP.FromAddress == "" || !strings.Contains(c.SMTP.FromAddress, "@") {
 		v.fail("SMTP_FROM_ADDRESS must be a valid e-mail address")
 	}
-	if c.Auth.JWTSecret == "" {
-		v.fail("AUTH_JWT_SECRET is required")
+	if c.Auth.TokenHMACSecret == "" {
+		v.fail("AUTH_TOKEN_HMAC_SECRET is required")
 	}
 	if c.Auth.BcryptCost < 10 || c.Auth.BcryptCost > 31 {
 		v.fail("AUTH_BCRYPT_COST=%d is outside the supported 10-31 range", c.Auth.BcryptCost)
@@ -186,6 +177,21 @@ func (c *Config) Validate() error {
 	}
 	if c.Auth.AccessTokenTTL >= c.Auth.RefreshTokenTTL {
 		v.fail("AUTH_ACCESS_TOKEN_TTL must be shorter than AUTH_REFRESH_TOKEN_TTL")
+	}
+	if c.Auth.OTPTTL <= 0 || c.Auth.RegistrationProofTTL <= 0 {
+		v.fail("AUTH_OTP_TTL and AUTH_REGISTRATION_PROOF_TTL must be positive")
+	}
+	if c.Auth.TenantKeyCacheTTL <= 0 {
+		v.fail("AUTH_TENANT_KEY_CACHE_TTL must be positive")
+	}
+	if c.Auth.OTPMaxAttempts < 1 {
+		v.fail("AUTH_OTP_MAX_ATTEMPTS must be at least 1")
+	}
+	if c.Auth.OTPBlacklistTTL <= 0 {
+		v.fail("AUTH_OTP_BLACKLIST_TTL must be positive")
+	}
+	if c.Auth.BootstrapAdminEmail != "" && c.Auth.BootstrapAdminPassword == "" {
+		v.fail("AUTH_BOOTSTRAP_ADMIN_PASSWORD is required when AUTH_BOOTSTRAP_ADMIN_EMAIL is set")
 	}
 	if c.Messaging.Stream == "" || c.Messaging.DLQStream == "" {
 		v.fail("EVENTS_STREAM and EVENTS_DLQ_STREAM are required")
@@ -200,10 +206,9 @@ func (c *Config) Validate() error {
 		v.fail("EVENTS_BATCH_SIZE must be at least 1")
 	}
 
-	// Rules that only apply once real user data is involved.
 	if c.App.IsProduction() {
-		if len(c.Auth.JWTSecret) < minJWTSecretLen {
-			v.fail("AUTH_JWT_SECRET must be at least %d characters in production", minJWTSecretLen)
+		if len(c.Auth.TokenHMACSecret) < minHMACSecretLen {
+			v.fail("AUTH_TOKEN_HMAC_SECRET must be at least %d characters in production", minHMACSecretLen)
 		}
 		if c.Postgres.SSLMode == "disable" {
 			v.fail("POSTGRES_SSLMODE must not be 'disable' in production")

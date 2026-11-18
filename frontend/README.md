@@ -1,8 +1,12 @@
 # Ryugaware web
 
 Next.js 16 (App Router, TypeScript, Tailwind v4) frontend foundation for the Ryugaware website-builder platform.
-State is Redux Toolkit + RTK Query. All API calls are answered by a local dummy backend (JSON in `public/data/`),
-shaped exactly like a real REST API so it can be swapped for real HTTP later without touching any UI.
+State is Redux Toolkit + RTK Query. Every API call goes to the Go backend in `../backend` over HTTP with
+cookie sessions (`credentials: "include"`); point `NEXT_PUBLIC_API_URL` at it (default
+`http://localhost:8080/api/v1`).
+
+Only `/auth/*` exists on the backend today, so the auth screens work end to end and the dashboard
+sections will error until their modules are built.
 
 ```bash
 npm install
@@ -31,15 +35,6 @@ The sidebar groups these as **Workspace** (Websites, Templates), **Store** (Paym
 **Configuration** (Storage, Authentication, Contact details, Settings). On phones the tab bar shows Websites, Templates,
 Payments and a **More** sheet with every section.
 
-## Demo data scenarios
-
-With the dummy API, the sidebar (or the mobile More sheet) has a **Demo data** switch: *Normal*, *Empty*, *Small* and
-*Large*. It reshapes the store-section collections (domains, payments, delivery, users, storage, authentication, contact)
-so every screen can be reviewed with no data, a few rows, the seed data, or hundreds/thousands of generated rows.
-The choice is kept in `sessionStorage`; switching resets the in-memory db and the RTK Query cache
-(`baseApi.util.resetApiState()`). Modules opt in with `registerScenario(file, { empty?, small?, large? })`
-(`src/lib/api/dummy/scenario.ts`); large data is generated deterministically (`src/lib/api/dummy/fake.ts`).
-
 ## Images
 
 Generated artwork lives in `public/images/` (optimised WebP; the original exports in `public/assets_images/` are not used
@@ -52,18 +47,15 @@ image use the `app/icon.png`, `app/apple-icon.png` and `app/opengraph-image.png`
 ## Architecture
 
 ```
-public/data/*.json            seed data, shaped like API responses (envelope + meta)
 src/
   app/                        routes only: (auth)/* and (platform)/* groups, thin page.tsx files
   store/                      makeStore, typed hooks, provider; logout resets every slice
   lib/api/
-    baseApi.ts                the single createApi (tags, baseQuery switch dummy <-> HTTP)
-    types.ts config.ts        shared contracts, env flags
-    dummy/                    baseQuery, router, in-memory db, errors, session (dummy layer only)
+    baseApi.ts                the single createApi (tags, HTTP base query, RFC 9457 parsing, silent refresh)
+    types.ts config.ts        shared contracts, env config
   features/<module>/
     types.ts                  API + domain types
     api.ts                    RTK Query endpoints (injectEndpoints) + lifecycle handlers
-    dummy.ts                  that module's dummy routes (the only place JSON data is read)
     slice.ts                  client state (filters, drawers, drafts) + extraReducers on endpoint matchers
     schemas.ts                zod form validation
     components/               module UI built from shared components
@@ -81,16 +73,26 @@ src/
   so every API response/mutation updates its slice immediately.
 * **Mutations keep the cache consistent**: tag invalidation for counts/pagination, `updateQueryData` for instant in-place
   patches (update, optimistic delete, sign-out), `upsertQueryData` for login/logout/profile.
-* **Dummy backend returns clones** of its in-memory records, like a real server. RTK freezes cached data, so never hand out live objects.
+* **Errors arrive as RFC 9457 problem documents** and are normalised in `baseApi.ts` into
+  `{ status, data: { code, message, fieldErrors?, requestId? } }`. Components switch on `code`, never on prose.
+* **A 401 retries once** behind a silent `POST /auth/tokens/refresh`, so a 15-minute access token is invisible to the UI.
 
-## Switching to a real backend
+## Backend
 
-1. Set `NEXT_PUBLIC_USE_DUMMY_API=false` and `NEXT_PUBLIC_API_URL=...` (see `.env.example`).
-2. `baseApi.ts` then uses `fetchBaseQuery` with the same `{ url, method, params, body }` arguments and the same
-   `{ status, data: { code, message, fieldErrors? } }` error shape, so endpoints, slices and components are unchanged.
-3. Delete `src/lib/api/dummy/`, each `features/*/dummy.ts`, and `public/data/`.
+Start the dependencies and the API from `../backend`:
 
-Endpoint contracts are documented at the top of each `features/*/dummy.ts`.
+```bash
+cd ../backend
+docker compose up -d        # postgres, redis, minio, mailpit
+go run ./cmd/migrate up
+go run ./cmd/api            # http://localhost:8080
+```
+
+Registration is OTP-first: `/auth/email-verification/otp` → `/auth/email-verification/verify`
+(6-digit code) → `/auth/register`. The code arrives by e-mail; locally that means
+[Mailpit](http://localhost:8025), which catches every message the notification worker sends.
+
+The endpoint surface is listed under **HTTP surface** in `../backend/PROJECT_STATE.md`.
 
 ## Redux DevTools
 

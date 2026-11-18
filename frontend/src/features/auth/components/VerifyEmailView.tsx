@@ -1,108 +1,169 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
-import { CircleAlert, CircleCheck, Loader2, Mail } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CircleAlert, CircleCheck } from "lucide-react";
+import { Alert } from "@/components/platform/Alert";
+import { FormField } from "@/components/platform/FormField";
 import { Button } from "@/components/ui/Button";
-import { USE_DUMMY_API } from "@/lib/api/config";
+import { Input } from "@/components/ui/Input";
 import { isApiError } from "@/lib/api/types";
-import { useAppSelector } from "@/store/hooks";
-import { useResendVerificationMutation, useVerifyEmailMutation } from "../api";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { useRegisterMutation, useResendEmailOtpMutation, useVerifyEmailOtpMutation } from "../api";
 import { formatCountdown, useCountdown } from "../hooks";
-import { selectCooldownUntil, selectPendingEmail } from "../slice";
-import { StatusPanel, authLinkClass } from "./AuthLayout";
+import { otpSchema, type OtpValues } from "../schemas";
+import { clearPendingRegistration, selectCooldownUntil, selectPendingRegistration } from "../slice";
+import { AuthHeading, StatusPanel, authLinkClass } from "./AuthLayout";
 
-/** Four states: check-your-inbox, verifying, verified, link expired / invalid. */
+const primaryLink =
+  "inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-5 text-base font-medium text-white hover:bg-primary-hover";
+
+/**
+ * Second half of registration: the address is proved with a 6-digit code, and only then is the
+ * organization created. The details entered on the register screen live in Redux until that happens.
+ */
 export function VerifyEmailView() {
-  const params = useSearchParams();
-  const token = params.get("token");
-  const emailParam = params.get("email");
-  const pendingEmail = useAppSelector(selectPendingEmail);
-  const email = emailParam ?? pendingEmail ?? "";
-
-  const [verify, verifyState] = useVerifyEmailMutation();
-  const [resend, resendState] = useResendVerificationMutation();
+  const dispatch = useAppDispatch();
+  const pending = useAppSelector(selectPendingRegistration);
   const cooldownUntil = useAppSelector(selectCooldownUntil);
   const remaining = useCountdown(cooldownUntil);
 
-  // Verify once per token (guards against React strict-mode double effects).
-  const verifiedToken = useRef<string | null>(null);
-  useEffect(() => {
-    if (!token || verifiedToken.current === token) return;
-    verifiedToken.current = token;
-    verify({ token, email: emailParam ?? undefined });
-  }, [token, emailParam, verify]);
+  const [verifyOtp, { isLoading: verifying }] = useVerifyEmailOtpMutation();
+  const [registerAccount, { isLoading: registering, isSuccess }] = useRegisterMutation();
+  const [resend, { isLoading: resending }] = useResendEmailOtpMutation();
 
-  if (token) {
-    if (verifyState.isSuccess) {
-      return (
-        <StatusPanel
-          tone="success"
-          icon={<CircleCheck className="size-7" aria-hidden />}
-          title="Email verified"
-          actions={
-            <Link href="/websites" className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-5 text-base font-medium text-white hover:bg-primary-hover">
-              Continue to dashboard
-            </Link>
-          }
-        >
-          Your account is ready.
-        </StatusPanel>
-      );
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<OtpValues>({ resolver: zodResolver(otpSchema), defaultValues: { otp: "" }, mode: "onSubmit" });
+
+  const busy = verifying || registering;
+
+  const onSubmit = handleSubmit(async ({ otp }) => {
+    if (!pending) return;
+    try {
+      const { registrationToken } = await verifyOtp({ email: pending.email, otp }).unwrap();
+      await registerAccount({ ...pending, registrationToken }).unwrap();
+    } catch (e) {
+      if (!isApiError(e)) {
+        setError("root", { message: "Something went wrong. Please try again." });
+        return;
+      }
+      switch (e.data.code) {
+        case "invalid_otp":
+          setError("otp", { message: "That code isn’t right. Check your email and try again." });
+          break;
+        case "otp_expired_or_invalid":
+          setError("root", { message: "That code has expired. Send yourself a new one." });
+          break;
+        case "rate_limited":
+          setError("root", { message: "Too many attempts. Try again in about 30 minutes." });
+          break;
+        case "email_verification_required":
+        case "invalid_registration_token":
+          setError("root", { message: "Your verification expired. Send a new code and try again." });
+          break;
+        case "email_already_registered":
+        case "organization_name_already_exists":
+          setError("root", { message: `${e.data.message}. Start again with different details.` });
+          break;
+        default:
+          setError("root", { message: e.data.message });
+      }
     }
-    if (verifyState.isError) {
-      const expired = isApiError(verifyState.error) && verifyState.error.data.code === "link_expired";
-      return (
-        <StatusPanel
-          tone="danger"
-          icon={<CircleAlert className="size-7" aria-hidden />}
-          title={expired ? "This link has expired" : "This link isn’t valid"}
-          actions={
-            <Link
-              href={`/verify-email${email ? `?email=${encodeURIComponent(email)}` : ""}`}
-              className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-5 text-base font-medium text-white hover:bg-primary-hover"
-            >
-              Send a new link
-            </Link>
-          }
-        >
-          {expired ? "Verification links are valid for 24 hours. We can send you a new one." : "It may have been used already. We can send you a new one."}
-        </StatusPanel>
-      );
-    }
+  });
+
+  if (isSuccess) {
     return (
-      <StatusPanel icon={<Loader2 className="size-7 animate-spin" aria-label="Verifying" />} title="Verifying your email…">
-        This only takes a moment.
+      <StatusPanel
+        tone="success"
+        icon={<CircleCheck className="size-7" aria-hidden />}
+        title="Account created"
+        actions={
+          <Link href="/login" className={primaryLink}>
+            Sign in
+          </Link>
+        }
+      >
+        Your organization is ready. Sign in to pick a template and publish your first website.
+      </StatusPanel>
+    );
+  }
+
+  if (!pending) {
+    return (
+      <StatusPanel
+        tone="danger"
+        icon={<CircleAlert className="size-7" aria-hidden />}
+        title="Start your sign-up again"
+        actions={
+          <Link href="/register" className={primaryLink}>
+            Back to sign-up
+          </Link>
+        }
+      >
+        We don’t have your details any more — this page was reloaded or opened directly. Your code is
+        still valid for a few minutes once you start again.
       </StatusPanel>
     );
   }
 
   return (
-    <StatusPanel
-      icon={<Mail className="size-7" aria-hidden />}
-      title="Verify your email"
-      actions={
-        <>
-          <Button variant="secondary" size="lg" fullWidth disabled={remaining > 0 || !email} loading={resendState.isLoading} onClick={() => resend({ email })}>
-            {remaining > 0 ? `Resend email in ${formatCountdown(remaining)}` : "Resend email"}
-          </Button>
-          <p className="text-xs text-muted">
-            Wrong account?{" "}
-            <Link href="/login" className={authLinkClass}>
-              Use a different account
-            </Link>
-          </p>
-          {USE_DUMMY_API && (
-            <p className="rounded-md border border-dashed border-line-strong p-3 text-xs text-muted">
-              Demo: <Link href={`/verify-email?token=valid-token${email ? `&email=${encodeURIComponent(email)}` : ""}`} className={authLinkClass}>click the email link</Link> ·{" "}
-              <Link href="/verify-email?token=expired-token" className={authLinkClass}>expired link</Link>
-            </p>
+    <>
+      <AuthHeading
+        title="Check your email"
+        description={`We sent a 6-digit code to ${pending.email}. It expires in 5 minutes.`}
+      />
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
+        {errors.root?.message && <Alert tone="error">{errors.root.message}</Alert>}
+
+        <FormField label="Verification code" error={errors.otp?.message} hint="6 digits, from the email we just sent.">
+          {(c) => (
+            <Input
+              {...c}
+              mono
+              inputSize="lg"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              disabled={busy}
+              className="text-center text-xl tracking-[0.5em]"
+              {...register("otp")}
+            />
           )}
-        </>
-      }
-    >
-      We sent a verification link to {email ? <strong className="text-ink">{email}</strong> : "your email"}. Click it to activate your account.
-    </StatusPanel>
+        </FormField>
+
+        <Button type="submit" size="lg" fullWidth loading={busy}>
+          {registering ? "Creating account…" : verifying ? "Verifying…" : "Verify and create account"}
+        </Button>
+      </form>
+
+      <div className="mt-6 flex flex-col gap-3">
+        <Button
+          variant="secondary"
+          size="lg"
+          fullWidth
+          disabled={remaining > 0 || busy}
+          loading={resending}
+          onClick={() => resend({ email: pending.email })}
+        >
+          {remaining > 0 ? `Resend code in ${formatCountdown(remaining)}` : "Resend code"}
+        </Button>
+        <p className="text-center text-xs text-muted">
+          Wrong address?{" "}
+          <Link
+            href="/register"
+            className={authLinkClass}
+            onClick={() => dispatch(clearPendingRegistration())}
+          >
+            Start again
+          </Link>
+        </p>
+      </div>
+    </>
   );
 }
