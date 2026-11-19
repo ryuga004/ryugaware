@@ -1038,3 +1038,22 @@ never imports the messaging package and the platform never imports a module.
   predicate checked with two real tenants — tenant B cannot see tenant A's template, drafts are hidden
   from both, per-tenant category counts differ correctly, `page_count` is 13 and `features` has 8
   entries.
+- **2026-11-19** — **A template preview is frontend-only; the backend's template job starts at website
+  creation.** Owner's call, and it settles where the boundary runs: templates are platform-owned code,
+  so previewing one is pure rendering with no API call, while the backend owns creating a website from
+  a template and serving that website's content afterwards. New route
+  `app/(storefront)/preview/[template]/[[...path]]` → `TemplatePreviewRoute`, which calls
+  `previewSite()` and mounts the same `Storefront` renderer a real website uses, with no query hook of
+  any kind. `previewUrl` was dropped from `dto.Template` and from the frontend `Template` type; the
+  catalogue modal now links to `/preview/{slug}` it builds itself, so nothing reads a URL from the API.
+  `templates.preview_url` is consequently unused — see **Known gaps**.
+  This also forced the identifier reconciliation that had been recorded as a gap: the manifest declared
+  `id: "tpl_aurelia_commerce"` / `slug: "aurelia-commerce"`, but `website.templateId` flows from the
+  catalogue API into `getTemplate(templateId)`, so the renderer and the editor could never have
+  resolved a manifest. The manifest is now `id: "aurelia_commerce"`, `slug: "aurelia_commerce"` —
+  **one identifier across database, API, renderer and editor.**
+  This restores, without a backend, what the deleted dummy layer did by special-casing
+  `GET /storefront/preview`. Verified against the running dev server: `/preview/aurelia_commerce` and
+  its `products`, `cart`, `checkout` and `account` paths all return 200 with the storefront rendered
+  (16 catalogue products with ₹ prices, links scoped to the preview route), and an unknown slug
+  renders the "No template at this address" state instead of failing.
