@@ -126,6 +126,39 @@ func TestList_CursorMetaShape(t *testing.T) {
 	}
 }
 
+func TestList_PageMetaKeysAreCamelCase(t *testing.T) {
+	w := render(t, func(c *gin.Context) {
+		response.List(c, []string{"a"}, response.NewPageMeta(2, 6, 13))
+	})
+
+	var raw struct {
+		Meta map[string]any `json:"meta"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("body is not JSON: %v", err)
+	}
+	for _, key := range []string{"page", "pageSize", "total", "totalPages", "requestedAt"} {
+		if _, ok := raw.Meta[key]; !ok {
+			t.Errorf("meta is missing %q; got %v", key, raw.Meta)
+		}
+	}
+	for _, key := range []string{"page_size", "total_items", "total_pages"} {
+		if _, ok := raw.Meta[key]; ok {
+			t.Errorf("meta still carries the snake_case key %q", key)
+		}
+	}
+}
+
+func TestNewPageMeta_TotalPagesRoundsUp(t *testing.T) {
+	m := response.NewPageMeta(1, 6, 13)
+	if m.TotalPages != 3 {
+		t.Errorf("TotalPages = %d, want 3", m.TotalPages)
+	}
+	if m.RequestedAt.IsZero() {
+		t.Error("RequestedAt is zero, want the server clock")
+	}
+}
+
 func TestNewCursorMeta_EmptyCursorMeansEnd(t *testing.T) {
 	m := response.NewCursorMeta("", 20)
 	if m.HasMore {

@@ -83,7 +83,6 @@ export const TAG_TYPES = [
   "Organization",
   "Options",
   "Session",
-  "Me",
   "License",
   "Domain",
   "PaymentMethod",

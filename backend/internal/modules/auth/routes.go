@@ -51,6 +51,8 @@ func RegisterRoutes(group *gin.RouterGroup, h *handler.Handler, auth middleware.
 	optional := middleware.Authenticate(auth, false)
 	required := middleware.Authenticate(auth, true)
 
+	group.GET("/license", required, h.License)
+
 	g.GET("/me", optional, h.Me)
 	g.DELETE("/sessions/current", optional, h.Logout)
 	g.POST("/password/change", required, h.ChangePassword)

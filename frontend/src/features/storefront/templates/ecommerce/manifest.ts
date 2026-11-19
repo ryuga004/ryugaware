@@ -214,8 +214,8 @@ const SECTIONS: Record<string, SectionDef> = {
 const CONTENT_SECTIONS = ["hero", "shop_hero", "featured_categories", "product_showcase", "promo_banner", "brand_intro", "testimonials", "newsletter", "rich_text"];
 
 export const ECOMMERCE_TEMPLATE: TemplateManifest = {
-  id: "tpl_aurelia_commerce",
-  slug: "aurelia-commerce",
+  id: "aurelia_commerce",
+  slug: "aurelia_commerce",
   name: "Aurelia Commerce",
   version: "1.0.0",
   category: "ecommerce",

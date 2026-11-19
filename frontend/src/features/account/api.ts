@@ -1,26 +1,24 @@
 import { baseApi } from "@/lib/api/baseApi";
 import { getErrorMessage, isApiError, type Single } from "@/lib/api/types";
 import { pushToast } from "@/features/ui/slice";
-import type { License, UpdateMeInput, User } from "./types";
+import { authApi } from "@/features/auth/api";
+import type { AuthUser } from "@/features/auth/types";
+import type { License, UpdateMeInput } from "./types";
 
 const unwrap = <T,>(res: Single<T>) => res.data;
 
 export const accountApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getMe: build.query<User, void>({
-      query: () => "/me",
-      transformResponse: unwrap<User>,
-      providesTags: ["Me"],
-    }),
-
-    updateMe: build.mutation<User, UpdateMeInput>({
+    updateMe: build.mutation<AuthUser, UpdateMeInput>({
       query: (body) => ({ url: "/me", method: "PATCH", body }),
-      transformResponse: unwrap<User>,
+      transformResponse: unwrap<AuthUser>,
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          // The sidebar user menu and profile page read the same cache entry, so both update instantly.
-          dispatch(accountApi.util.updateQueryData("getMe", undefined, () => data));
+          // Every screen reads the profile from /auth/me, so patching that one entry updates all of them.
+          dispatch(authApi.util.updateQueryData("getSession", undefined, (draft) => {
+            draft.user = data;
+          }));
           dispatch(pushToast({ tone: "success", title: "Profile updated" }));
         } catch (e) {
           const error = (e as { error?: unknown }).error;
@@ -39,4 +37,4 @@ export const accountApi = baseApi.injectEndpoints({
   }),
 });
 
-export const { useGetMeQuery, useUpdateMeMutation, useGetLicenseQuery } = accountApi;
+export const { useUpdateMeMutation, useGetLicenseQuery } = accountApi;

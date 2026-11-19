@@ -1,11 +1,16 @@
+/** `roles.type` on the backend, sent verbatim. */
+export type UserRole = "super_admin" | "admin" | "member" | "custom";
+
 export interface AuthUser {
   id: string;
   fullName: string;
   email: string;
   orgName: string;
   tenantId: string;
-  role: string;
+  role: UserRole;
   privileges: string[];
+  createdAt: string;
+  passwordChangedAt: string;
 }
 
 export interface SessionInfo {

@@ -39,7 +39,7 @@ What must be tested, with which tools, and where the test lives.
   tenant B.
 - **Mass assignment**: post a payload containing `tenant_id`, `role_id`, `is_active`,
   `email_verified_at` and assert the stored row is unchanged.
-- **Serialization**: assert a response body contains exactly the expected `snake_case` keys and
+- **Serialization**: assert a response body contains exactly the expected `camelCase` keys and
   **does not** contain `password_hash`, `jwt_secret`, `tenant_id` where it is not part of the contract.
 - **Error contract**: each error path returns `application/problem+json`, the documented `code`,
   `status`, `type`, `title`, and — for validation — the `errors` array with a JSON Pointer per field.

@@ -3,7 +3,7 @@
 > **Source of truth.** Read this instead of re-reading the codebase.
 > Maintained per Rule 0 in [`AGENTS.md`](./AGENTS.md): update it in the same turn as any change.
 >
-> Last updated: 2026-11-17 · Go 1.27.4 · module `github.com/ryuga/ryugaware/backend`
+> Last updated: 2026-11-19 · Go 1.27.4 · module `github.com/ryuga/ryugaware/backend`
 
 ---
 
@@ -15,7 +15,7 @@
 | 2 | `internal/config` — typed config, validation | ✅ done |
 | 3 | `internal/platform/logger` — slog | ✅ done |
 | 4 | `internal/shared/apperrors`, `internal/shared/response` | ✅ done |
-| 5 | `internal/platform/database` + migrations | ✅ done (auth schema only) |
+| 5 | `internal/platform/database` + migrations | ✅ done (auth, notification and template schema) |
 | 6 | `internal/platform/redis` | ✅ done (client + key builder) |
 | 7 | `internal/platform/storage` (S3/MinIO) | ⬜ not started |
 | 8 | `internal/platform/email` (SMTP/Mailpit) | ✅ done (stdlib SMTP, none/STARTTLS/TLS) |
@@ -23,10 +23,11 @@
 | 10 | `internal/bootstrap` + `cmd/api` lifecycle | ✅ done (wiring, health, graceful shutdown) |
 | 11 | `auth` module | ✅ done (12 endpoints, 40 unit tests, smoke-tested end to end) |
 | 12 | `admin` module | ⬜ not started |
+| 12b | `templates` module | ✅ read-only catalogue (3 endpoints, 10 unit tests) |
 | 13 | `audit` module + consumer | ⬜ not started |
 | 14 | `notification` module + e-mail worker | ✅ worker delivers mail; **no admin endpoints** |
 | 15 | `internal/shared/middleware` + route registration | ✅ done |
-| 16 | Unit + integration tests | 🟨 52 unit tests (40 auth, 7 notification, 5 response); **no automated integration tests** |
+| 16 | Unit + integration tests | 🟨 69 unit tests (45 auth, 10 templates, 7 notification, 7 response); **no automated integration tests** |
 | 17 | Dockerfile + compose | 🟨 `compose.yaml` (postgres, redis, minio, mailpit) + `.env.example`; **no app Dockerfile** |
 | 18 | GitHub Actions CI/CD, Makefile, README | ⬜ not started |
 
@@ -88,8 +89,9 @@ token cannot carry stale privileges.
 | `internal/modules/auth/dto` | request/response structs (camelCase JSON) | ✅ |
 | `internal/modules/auth/repository` | all auth SQL, opaque `Tx` handle, `InTransaction`, duplicate-constraint helper | ✅ |
 | `internal/modules/auth/store` | Redis OTP / proof / session / reset / rate-limit, four Lua scripts | ✅ |
-| `internal/modules/auth/service` | verification, registration, sessions, passwords, JWT, bcrypt+pepper, platform-admin bootstrap | ✅ |
-| `internal/modules/auth/handler` | 12 handlers, cookie handling | ✅ |
+| `internal/modules/auth/service` | verification, registration, sessions, passwords, JWT, bcrypt+pepper, platform-admin bootstrap, `license.go` (tenant licence + derived status/remaining) | ✅ |
+| `internal/modules/auth/handler` | 13 handlers, cookie handling | ✅ |
+| `internal/modules/templates/{model,dto,repository,service,handler}` | read-only template catalogue: visibility predicate, page-based list with category counts, slug/key lookups | ✅ |
 | `internal/bootstrap` | router + middleware stack, module wiring, health, relay, graceful shutdown | ✅ |
 | `cmd/api` | config → logger → bootstrap → signal-driven shutdown | ✅ |
 | `cmd/migrate` | `up`/`down`/`drop`/`goto`/`force`/`version` over the embedded SQL, waits for Postgres | ✅ |
@@ -162,7 +164,11 @@ Live. Health is unversioned; everything else is under `/api/v1`. Request and res
 | POST | `/api/v1/auth/register` | registration proof | create tenant + admin user + licence |
 | POST | `/api/v1/auth/sessions` | public | login, sets both cookies |
 | POST | `/api/v1/auth/tokens/refresh` | refresh cookie | rotate the session |
-| GET | `/api/v1/auth/me` | optional | `{authenticated, user}` — 200 either way |
+| GET | `/api/v1/auth/me` | optional | `{authenticated, user}` — 200 either way. The **only** profile read: carries `id`, `fullName`, `email`, `orgName`, `tenantId`, `role` (`roles.type` verbatim), `privileges`, `createdAt`, `passwordChangedAt` |
+| GET | `/api/v1/templates` | session | catalogue list. Query `search`, `category`, `page`, `pageSize`. **Page-based, not cursor** (`backend-api.md` §5 exception): the UI needs a total count and random page access for its pager. `meta` carries `categories` — all 6 `template_categories` with counts, plus a synthesised `all` |
+| GET | `/api/v1/templates/:slug` | session | one template; `id` in the body **is the slug**. No `previewUrl`: previewing is a frontend concern (see Decision log, 2026-11-19) |
+| GET | `/api/v1/templates/:slug/pages/:key` | session | one template page, addressed by its manifest key |
+| GET | `/api/v1/license` | session | the caller's tenant licence: `plan`, `status`, `allowance`, `used`, `remaining`, `limitReached`, `validUntil`. `status` is derived (`expires_at <= now` → `expired`), not stored |
 | DELETE | `/api/v1/auth/sessions/current` | optional | logout, idempotent |
 | POST | `/api/v1/auth/password/forgot` | public | queue a reset e-mail, always `{sent:true}` |
 | GET | `/api/v1/auth/password/reset/validate?token=` | public | `{valid}` without consuming the token |
@@ -170,6 +176,8 @@ Live. Health is unversioned; everything else is under `/api/v1`. Request and res
 | POST | `/api/v1/auth/password/change` | session | change password, revoke every session |
 
 Planned, not implemented: `/admin/*` (users, roles), `/admin/audit-events`, `/admin/notifications`.
+`/license` is the one non-`/auth` route the auth module registers, because it owns the `licenses` table
+while a licence is an entitlement rather than an authentication concern.
 
 Registration flow: **e-mail is verified before any row exists.** OTP (5 min, 3 attempts, 30-minute
 lockout) → registration proof (random token, hash in Redis, 3 min) → `/auth/register` consumes the
@@ -192,8 +200,13 @@ All PKs are `UUID DEFAULT gen_random_uuid()`; all timestamps are `TIMESTAMPTZ`, 
 | `email_templates` | notification | `tenant_id` (**nullable**), `name`, `subject`, `body`, `variables` JSONB | `tenant_id IS NULL` = platform default |
 | `email_deliveries` | notification | `event_id` PK, `tenant_id`, `template`, `to_address`, `status`, `attempts`, `error`, `sent_at` | Idempotency for the worker: a redelivered event whose row is `SENT` is skipped. A `FAILED` row keeps the reason for support |
 | `outbox_events` | platform/messaging | `event_id` PK, `event_type`, `aggregate_id`, `tenant_id`, `payload`, `metadata`, `status`, `attempts`, `available_at`, `published_at` | Written inside the business transaction, drained by the relay. Partial index on `(available_at, created_at) WHERE status = 'PENDING'` |
+| `template_categories` | templates | `slug` (**UNIQUE**), `name`, `sort_order` | Fixed platform catalog, global (no `tenant_id`). Six seeded rows at ids `…0001-00000000000{1..6}`: `ecommerce`, `food_delivery`, `restaurant`, `services`, `portfolio`, `education` |
+| `templates` | templates | `tenant_id` (**nullable**), `category_id`, `slug`, `name`, `description`, `version`, `status`, `thumbnail_theme`, `preview_url`, `default_theme` JSONB | `tenant_id IS NULL` = platform template, offered to every tenant. `UNIQUE (tenant_id, slug)` plus a partial unique index on `slug WHERE tenant_id IS NULL`, because `NULL ≠ NULL`. `category_id` is `ON DELETE NO ACTION` |
+| `template_pages` | templates | `template_id`, `key`, `path`, `kind` (`content`/`system`), `sort_order`, `variables` JSONB, `preview_url` | One row per page. `variables` is intended as the editable surface — `{key: {type, label, default, …}}` — but the 13 seeded rows leave it `{}`: by the 2026-11-19 decision the editor schema stays in the frontend manifest and the database holds catalogue data only. `UNIQUE (template_id, key)`; `UNIQUE (id, template_id)` exists only as the composite-FK target below |
+| `template_assets` | templates | `template_id`, `page_id` (**nullable**), `key`, `kind`, `default_url`, `alt_text`, `sort_order` | The files a template ships with. `page_id IS NULL` = template-wide (logo, favicon). `template_assets_page_same_template_fkey (page_id, template_id) → template_pages (id, template_id)` makes an asset on another template's page impossible; being MATCH SIMPLE it is skipped exactly when `page_id` is NULL, which is the template-wide case. Partial unique indexes on `(page_id, key)` and `(template_id, key)` |
 
-Deleting a `tenants` row removes the whole tenant by cascade, licence included.
+Deleting a `tenants` row removes the whole tenant by cascade, licence included — and now its own
+templates, their pages and those pages' assets.
 
 **Sessions are not in Postgres.** Refresh tokens, OTPs, registration proofs and reset tokens live only
 in Redis, all hashed — see the Redis key list below.
@@ -215,7 +228,8 @@ Four Lua scripts keep the multi-step operations atomic: OTP verify (compare → 
 increment attempts → blacklist), proof consume (compare → delete), refresh rotate (compare → replace,
 or detect reuse), reset consume (read → delete).
 
-Planned, not created: `audit_events`, `email_deliveries`.
+Planned, not created: `audit_events`, `websites`, `site_contents` and the per-website table that
+overrides a `template_assets.default_url` with the customer's own upload.
 
 **No performance indexes beyond the outbox one.** Every other index backs a PK or a uniqueness
 constraint, so FK columns remain unindexed.
@@ -229,13 +243,15 @@ constraint, so FK columns remain unindexed.
 
 | Version | File | Creates |
 |---|---|---|
+| 4 | `ecommerce_template` | Seed only, no DDL: the platform `aurelia_commerce` template (Aurelia Commerce) + its 13 `template_pages`. Ids are left to `gen_random_uuid()`; rows are addressed by `slug` / `key`, and `down` deletes the template by slug and lets `template_pages` cascade |
+| 3 | `templates` | `template_categories` (+ the 6 seeded categories), `templates` (incl. `features` / `payment_methods` JSONB arrays), `template_pages`, `template_assets` |
 | 2 | `notification_delivery` | `email_deliveries`; rewrites the platform `password_reset` template from an OTP code to a `{{reset_url}}` button |
 | 1 | `init` | `citext`, `pgcrypto`; `tenants`, `licenses`, `roles`, `privileges`, `role_privileges`, `platform_users`, `outbox_events`, `email_templates`; seeds: the platform tenant, the 3 global roles, their privilege mappings, the 22-row privilege catalog and the 5 platform default templates |
 
-**There is exactly one migration.** The five original files were merged into
-`000001_init.{up,down}.sql` by owner request, so the whole schema is created and
-dropped as one unit. Later schema changes get their own numbered pair; this file
-is not edited again once it has been applied anywhere real.
+`000001_init.{up,down}.sql` is the five original files merged into one pair by owner
+request, so the whole base schema is created and dropped as a unit. It has been
+applied for real and is not edited again; every later change is its own numbered
+pair, as 2 and 3 are.
 
 The SQL carries no comments, by request.
 
@@ -357,12 +373,12 @@ never imports the messaging package and the platform never imports a module.
 - **The OTP mail is published directly, not through the outbox**, because no database row accompanies
   it. If Redis accepts the publish and the worker then fails permanently, the user sees "sent" and
   never receives a code; the `email_deliveries` row records the failure for support.
-- `admin`, `audit` and `notification` modules are unwritten, so `/admin/*` returns 404.
+- `admin` and `audit` modules are unwritten, so `/admin/*` returns 404.
 - `internal/platform/storage` (S3/MinIO) is unwritten; the AWS SDK is not in `go.mod`.
-- **No automated integration tests.** The 52 unit tests use fakes; the end-to-end run described in
-  the Build log was done by hand and is not repeatable in CI. Cross-tenant tests required by
-  `.claude/rules/backend-multitenancy.md` §6 do not exist — there is only one tenant-owned table so
-  far, but the pattern must be in place before `admin` lands.
+- **No automated integration tests.** The 69 unit tests use fakes; the end-to-end runs described in
+  the Build log were done by hand and are not repeatable in CI. Cross-tenant tests required by
+  `.claude/rules/backend-multitenancy.md` §6 do not exist — the `/templates` predicate is the first
+  one that genuinely needs them, and the pattern must be in place before `admin` lands.
 - **The frontend now speaks this API.** `frontend/src/features/auth` and `lib/api/baseApi.ts` were
   rewritten for it: the real paths, camelCase bodies, RFC 9457 parsing into the flat
   `{code, message, fieldErrors}` the forms already read, OTP-first registration, and a silent
@@ -374,6 +390,14 @@ never imports the messaging package and the platform never imports a module.
   fixtures and the demo-data switcher are gone, so every dashboard page now depends on a backend
   module that does not exist yet and will show its error state until `admin`, `audit` and
   `notification` are built.
+- **Profile write is still unbuilt, and `/license` reports zero usage.** `GET /api/v1/license` is live,
+  but `used` is hardcoded to `0` in `service.TenantLicense` (so `remaining` always equals `allowance`
+  and `limitReached` is only ever true for a zero allowance) because there is no `websites` table to
+  count. The ProfilePage usage bar therefore reads "0 of N used" — a real-looking number that is not
+  real until the websites module lands and supplies the count. `features/account` still calls
+  `PATCH /api/v1/me` (the "Edit profile" drawer) and `features/settings` calls
+  `POST /api/v1/account/password`; neither exists — the backend's password change is
+  `POST /api/v1/auth/password/change`. Those two paths still 404.
 - **A tenant's signing key is cached for `AUTH_TENANT_KEY_CACHE_TTL` (5 min).** Deactivating a tenant
   therefore stops its *existing* access tokens up to five minutes later, because the key lookup is what
   is cached. Logout, password changes and user deactivation are unaffected — they are checked per
@@ -390,7 +414,36 @@ never imports the messaging package and the platform never imports a module.
   `AUTH_MAX_ACTIVE_SESSIONS`.
 - Row-Level Security and `Idempotency-Key` remain unimplemented standards.
 - `cmd/migrate drop` succeeds but exits 1 (reads the version after dropping `schema_migrations`).
-- `.env.example`, `Makefile`, `Dockerfile`, `compose.yaml`, CI workflows and README: not written.
+- `Makefile`, `Dockerfile`, CI workflows and README: not written.
+- **The `templates` module is read-only and covers 3 of the 4 template tables.** `template_assets` has
+  no model, repository or route, and nothing writes a template: there is no create/update/publish path,
+  so a tenant cannot own a custom template yet even though the schema and the visibility predicate
+  already allow it.
+- **The tenant predicate on `/templates` is proven by SQL, not by an automated test.** The 10 service
+  tests use a fake repository, so they assert that the caller's tenant id reaches every query — not that
+  the SQL filters by it. The predicate itself was checked by hand against Postgres 17 (tenant B cannot
+  see tenant A's template; drafts are hidden from both). The cross-tenant test required by
+  `backend-multitenancy.md` §6 needs the integration harness that still does not exist.
+- **`templates.preview_url` is written by nothing and read by nothing.** The column exists in
+  migration 3 but the template DTO no longer exposes it: a template preview is rendered by the
+  frontend from its own manifest, so there is no URL for the backend to hand out. Drop the column, or
+  give it a meaning, when the storefront module lands.
+- **`template_pages.variables` is a schema the database does not check.** Postgres enforces only
+  `jsonb_typeof = 'object'`. A misspelled `"type"`, a missing `"default"` or a variable the renderer
+  does not know about is a runtime bug, not a constraint violation. The validation has to live in the
+  service that writes templates, and that service does not exist yet.
+- **Sections are not modelled.** `template_pages.variables` is one flat bag per page, so a customer
+  edits a page's fields but cannot add, remove or reorder sections on it. The frontend's
+  `SectionDef` / `SiteSection` types in `features/storefront/types.ts` still describe a section
+  builder; one of the two has to give when the editor is wired up.
+- **`"default": "asset:<key>"` is a convention, not a constraint.** An image variable points at a
+  `template_assets.key` by string. Nothing stops the asset being deleted or renamed out from under it.
+- **The frontend's `TemplateCategory` union is two values** (`"ecommerce" | "services"`) against six
+  seeded categories, and `WebsiteType` mirrors it. Either the union widens or the frontend starts
+  reading the category list from the API.
+- **Six decisions in migration 3 were taken without an owner answer** (Decisions 53–58) because the
+  instruction was to implement. Each is recorded there with what it would cost to reverse; the
+  cheapest to change now are the category labels and `sort_order`.
 
 ---
 
@@ -699,6 +752,46 @@ never imports the messaging package and the platform never imports a module.
     vocabulary inside another module and make every new fact a notification concern. Payload keys now
     match each template's declared `variables` exactly, so a renderer miss is a bug, not a shrug.
 
+53. **2026-11-19 — The template tables say `tenant_id`, not `customer_id`.** The instruction said
+    "customer ID". Decision 22 already renamed `organizations` → `tenants` and every
+    `organization_id` → `tenant_id`, and `ask-before-assuming.md` §6 names that churn as its own
+    evidence. Introducing `customer_id` on three new tables would leave two words for one entity
+    across eleven tables permanently, so the established one wins. Reversing it is a column rename on
+    `templates` only — the other three reach the tenant through `template_id`.
+54. **2026-11-19 — `templates.tenant_id` is nullable: NULL = platform template.** Same shape as
+    `email_templates` (Decision 17) and `roles.tenant_id` (Decision 40), and for the same reason: a
+    brand-new tenant has to be offered something in the create-website wizard, and a NOT NULL column
+    would answer that only by comparing against the magic platform-tenant id `…0001`. The cost is the
+    partial unique index `uq_templates_platform_slug`, needed because `UNIQUE (tenant_id, slug)` does
+    not constrain rows whose `tenant_id` is NULL.
+55. **2026-11-19 — A page is `key`, `path`, `kind`, `sort_order` and one `variables` JSONB.** Owner's
+    instruction: `label`, `description`, `is_required`, `required_reason` and `governed_by` were all
+    dropped, and every editable value a page renders now lives in `variables` as
+    `{key: {type, label, default, …}}` with its default. The typed form was chosen over a bare
+    `{key: default}` map so the editor can build its controls from the row and adding a variable needs
+    no frontend release; the cost is that the type information is JSON the database cannot validate
+    (recorded under **Known gaps**). `sort_order` was kept against the trend of that instruction
+    because page order has to live somewhere and the alternative is an arbitrary order.
+56. **2026-11-19 — Template assets are their own table, not entries in `variables`.** A default file
+    needs a kind, alt text and an identity that survives being replaced by a customer upload, and the
+    per-website override table will join to it on `key`. `page_id` is nullable so a logo or favicon can
+    belong to the template rather than one page. Cross-template attachment is blocked by the composite
+    FK `(page_id, template_id) → template_pages (id, template_id)` rather than an application check —
+    the same reasoning as Decision 11. That FK is MATCH SIMPLE, so it is skipped precisely when
+    `page_id` is NULL, which is exactly the template-wide case and not a hole.
+57. **2026-11-19 — `template_assets.default_url` is plain `TEXT` holding either a storage object key or
+    an absolute URL.** The service resolves a relative value against `STORAGE_PUBLIC_ENDPOINT` and
+    passes an absolute one through. Storing only absolute URLs would make moving buckets an `UPDATE`
+    across every row; forcing only keys would block seeding from a CDN today, while
+    `internal/platform/storage` is still unwritten. No format CHECK beyond non-blank, so neither choice
+    is baked into the schema.
+58. **2026-11-19 — Migration 3 seeds the six categories and no templates.** `backend-migration` §2
+    limits seeds to fixed platform catalogs, and a template is not fixed — it ships with a code bundle
+    and a version. The category slugs (`ecommerce`, `food_delivery`, `restaurant`, `services`,
+    `portfolio`, `education`) and their labels were chosen without an owner answer and are the
+    cheapest thing here to change: a `name` update is copy, a `slug` update is one statement while
+    nothing references them.
+
 ---
 
 ## Build log
@@ -858,3 +951,90 @@ never imports the messaging package and the platform never imports a module.
   `platform/storage`, `shared/validate`, `deployments`, `scripts`, `tests/{integration,testdata}`,
   `.github/workflows`). None contained a Go file, so no package changed and the build is unaffected;
   git never tracked them. They are recreated when the code that belongs in them is written.
+- **2026-11-19** — `/auth/me` is the single profile endpoint. The frontend had a second, never-built
+  `GET/PATCH /api/v1/me` behind `features/account`, whose expected shape disagreed with the schema in
+  four places. Rather than build a second endpoint returning overlapping user data, `dto.CurrentUser`
+  grew `createdAt` and `passwordChangedAt` (both already loaded by `CurrentUser`, no query change) and
+  the frontend's `accountApi.getMe` was deleted; `UserMenu`, `ProfilePage`, `SettingsPage` and
+  `EditProfileDrawer` now read the one `/auth/me` cache entry through a `useCurrentUser()` hook.
+  Resolved with the owner: `emailVerified` is **dropped, not modelled** — registration verifies the
+  address by OTP before the user row exists, so the field could only ever be `true` and no
+  `email_verified_at` column is warranted; `role` is sent as `roles.type` verbatim
+  (`super_admin`/`admin`/`member`/`custom`) with the display mapping living in the frontend, so API, DB
+  and UI share one vocabulary. `PATCH /me` and `GET /license` were deliberately left unbuilt for now,
+  so `EditProfileDrawer` and the ProfilePage licence section still call endpoints that do not exist —
+  see **Known gaps**.
+- **2026-11-19** — Added `GET /api/v1/license`, the auth module's only non-`/auth` route: it owns the
+  `licenses` table, but a licence is an entitlement, not an authentication concern, and the path the
+  frontend already called was `/license`. New `repository.GetLicense` (tenant-predicated),
+  `service.TenantLicense` and `handler.License`, plus a `dto.License`. Resolved with the owner:
+  `status` is **derived, not stored** (`expires_at <= now` → `expired`, else `active`) — no column, no
+  migration; `suspended` was dropped from the frontend union because an inactive tenant is already
+  rejected at authentication, so the value could never be rendered. `used` is `0` until a `websites`
+  table exists; `remaining` and `limitReached` are computed from it so they start working unchanged
+  when the real count arrives — see **Known gaps**. ProfilePage now renders the role as a `Badge`
+  chip (ember for `super_admin`, neutral otherwise) with the display mapping in
+  `frontend/src/features/auth/constants.ts`, keeping `roles.type` verbatim on the wire. 5 new service
+  tests (active, expiry boundary incl. exactly-now, zero allowance, missing licence, and the
+  cross-tenant case required by `backend-multitenancy.md` §6) bring the suite to 57.
+- **2026-11-19** — Added migration 3, `000003_templates.{up,down}.sql`: `template_categories` (6 seeded
+  rows), `templates`, `template_pages`, `template_assets`. **Schema only — no Go code changed**, and no
+  module owns the tables yet (see **Known gaps**). Decisions 53–58 record the six choices taken without
+  an owner answer. Verified on a throwaway Postgres 17.12 container with migrations 1 and 2 applied
+  first: the 6 categories seed in order; `templates` defaults read back as `draft` / `1.0.0` / `{}`; a
+  second platform template with the same slug is rejected by `uq_templates_platform_slug` while two
+  different tenants may each own slug `aurelia`, and a repeat within one tenant is rejected by
+  `templates_tenant_id_slug_key`; deleting a category still in use is refused; the slug, path, kind and
+  `jsonb_typeof(variables)` CHECKs each reject their bad row; a duplicate page key per template is
+  rejected but the same key on another template is fine; four page assets and one template-wide asset
+  (`page_id IS NULL`) insert, their partial unique indexes reject duplicates, a blank `default_url` is
+  refused, and an asset pointing at another template's page is refused by
+  `template_assets_page_same_template_fkey`. Cascades checked at all three levels: deleting a page
+  removes its assets and leaves the template-wide one, deleting a template removes its pages and
+  assets, deleting a tenant removes its template, pages and assets, and the categories survive.
+  `down` leaves no `template%` table or index behind, `up` re-applies and re-seeds cleanly, all 11
+  indexes on the new tables are unique or primary keys (no performance indexes, as instructed), and a
+  full `3 → 2 → 1` teardown leaves 0 tables and only `plpgsql`, after which all three re-apply to 13
+  tables. `go build ./... && go vet ./... && gofmt -l .` clean; `go test ./...` still green at 57.
+- **2026-11-19** — Seeded the first platform template (migration 4, seed only, no DDL): the
+  `aurelia_commerce` template plus its 13 `template_pages`, taken from the frontend manifest
+  `features/storefront/templates/ecommerce/manifest.ts`. Resolved with the owner:
+  (1) **the database holds catalogue data only** — `sections{}`, `themeFields[]` and each page's
+  `allows[]` stay in the TS manifest, which is why `template_pages.variables` is seeded `{}`;
+  (2) **the slug is the public identifier** — the API will expose `id: "aurelia_commerce"` and keep
+  the UUID PK internal, so `GET /templates/{slug}/pages/{key}` is the page address, not a UUID pair;
+  (3) scope was the migration alone, so no `templates` module was written.
+  The slug is `aurelia_commerce`, not the manifest's `aurelia-commerce`: `templates.slug` is
+  `CHECK (slug ~ '^[a-z][a-z0-9_]*$')`, which has no hyphen, and underscores already match
+  `template_categories.slug` (`food_delivery`) and `thumbnail_theme` (`aurelia_commerce`, the image
+  filename). Row ids are **not** pinned — `gen_random_uuid()` fills them and the seed resolves its
+  category by `slug`, so nothing depends on a hand-written UUID; `down` deletes by slug and
+  `template_pages` cascades. Verified on a throwaway Postgres 17 container: 1→4 up, row counts
+  checked, 4 down (pages cascade to 0, the 6 categories survive), 4 up again, then a full 4→1 down
+  leaving zero tables and a clean second full up.
+- **2026-11-19** — List responses moved to **camelCase** and the `templates` module landed.
+  `response.PageMeta` was `{page, page_size, total_items, total_pages}`; it is now
+  `{page, pageSize, total, totalPages, requestedAt}`, and `CursorMeta` is `{nextCursor, hasMore,
+  pageSize}`. The frontend's shared `Paginated` type already expected that shape and three features
+  (websites, customers, delivery) already read it, so the backend moved rather than the frontend.
+  `requestedAt` is the server clock at response time, which those list screens render as "updated at".
+  `.claude/rules/backend-api.md` §3/§5 and `backend-testing.md` §3 said snake_case and were corrected —
+  they had already been contradicted by every shipped auth DTO. Two regression tests now pin the key
+  names. The new `templates` module (`model`/`dto`/`repository`/`service`/`handler`/`routes.go`) is
+  read-only and serves `GET /templates`, `/templates/:slug` and `/templates/:slug/pages/:key`, all
+  behind a required session. Decided with the owner: **the slug is the public id** (`id` in the body is
+  the slug, the UUID never leaves the backend) and pages are addressed by their manifest `key`;
+  visibility is `status = 'published' AND (tenant_id IS NULL OR tenant_id = <session tenant>)`, so
+  tenant-owned templates work later with no rewrite; `meta.categories` returns **all six** categories
+  with zero counts included, plus a synthesised `all`. `features` and `payment_methods` were added to
+  `templates` by editing migrations 3 and 4 directly (owner confirmed neither had been applied
+  anywhere). They are **JSONB arrays, not `TEXT[]`**: `TEXT[]` through GORM would have promoted
+  `lib/pq` from an indirect to a direct dependency, and JSONB matches how `default_theme` and
+  `variables` are already handled with `[]byte` + `encoding/json`. Nothing queries on either column,
+  only displays them. Also fixed a message bug introduced the same day:
+  `apperrors.NotFound` appends " not found" itself, so `NotFound("No license found for this
+  organization")` had been rendering "…organization not found"; call sites now pass a bare noun.
+  Verified on a throwaway Postgres 17: full 1→4 up/down/up with zero leftovers, and the visibility
+  predicate checked with two real tenants — tenant B cannot see tenant A's template, drafts are hidden
+  from both, per-tenant category counts differ correctly, `page_count` is 13 and `features` has 8
+  entries.

@@ -161,6 +161,18 @@ func (r *Repository) PrivilegeNames(ctx context.Context, roleID uuid.UUID) ([]st
 	return names, nil
 }
 
+func (r *Repository) GetLicense(ctx context.Context, tenantID uuid.UUID) (*model.License, error) {
+	var license model.License
+	err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).First(&license).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("auth: get license: %w", err)
+	}
+	return &license, nil
+}
+
 func (r *Repository) CreateLicense(ctx context.Context, tx Tx, l *model.License) error {
 	if err := r.conn(tx).WithContext(ctx).Create(l).Error; err != nil {
 		return fmt.Errorf("auth: create license: %w", err)

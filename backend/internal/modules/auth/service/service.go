@@ -26,6 +26,7 @@ type Repo interface {
 	GetGlobalRole(ctx context.Context, roleType string) (*model.Role, error)
 	GetRole(ctx context.Context, id uuid.UUID) (*model.Role, error)
 	PrivilegeNames(ctx context.Context, roleID uuid.UUID) ([]string, error)
+	GetLicense(ctx context.Context, tenantID uuid.UUID) (*model.License, error)
 	CreateLicense(ctx context.Context, tx repository.Tx, l *model.License) error
 	AppendOutbox(ctx context.Context, tx repository.Tx, e *model.OutboxEvent) error
 }

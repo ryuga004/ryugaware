@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { isApiError } from "@/lib/api/types";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { useGetMeQuery, useUpdateMeMutation } from "../api";
+import { useCurrentUser } from "@/features/auth/hooks";
+import { useUpdateMeMutation } from "../api";
 import { closeEditProfile, selectEditProfileOpen } from "../slice";
 
 const schema = z.object({ fullName: z.string().trim().min(1, "Enter your full name.").max(80, "Use 80 characters or fewer.") });
@@ -23,7 +24,7 @@ export function EditProfileDrawer() {
 
 function EditProfileForm() {
   const dispatch = useAppDispatch();
-  const { data: me } = useGetMeQuery();
+  const { user: me } = useCurrentUser();
   const [updateMe, { isLoading }] = useUpdateMeMutation();
   const {
     register,

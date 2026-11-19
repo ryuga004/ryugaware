@@ -10,12 +10,14 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { UsageBar } from "@/components/ui/UsageBar";
 import { formatDate } from "@/lib/format";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { useGetLicenseQuery, useGetMeQuery } from "../api";
+import { roleLabel, roleTone } from "@/features/auth/constants";
+import { useCurrentUser } from "@/features/auth/hooks";
+import { useGetLicenseQuery } from "../api";
 import { openEditProfile, selectLicense } from "../slice";
 
 export function ProfilePage() {
   const dispatch = useAppDispatch();
-  const { data: me, isLoading: meLoading, isError: meError, refetch: refetchMe, isFetching: meFetching } = useGetMeQuery();
+  const { user: me, isLoading: meLoading, isError: meError, refetch: refetchMe, isFetching: meFetching } = useCurrentUser();
   const { data: licenseData, isLoading: licenseLoading, isError: licenseError, refetch: refetchLicense } = useGetLicenseQuery();
   const snapshot = useAppSelector(selectLicense); // live-updated by website create / delete
   const license = licenseData && snapshot ? { ...licenseData, used: snapshot.used, limitReached: snapshot.limitReached } : licenseData;
@@ -45,7 +47,6 @@ export function ProfilePage() {
                     <p className="font-heading text-base font-semibold">{me.fullName}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="text-sm text-muted">{me.email}</span>
-                      {me.emailVerified && <Badge tone="success">Verified</Badge>}
                     </div>
                   </div>
                 </div>
@@ -56,7 +57,15 @@ export function ProfilePage() {
               <div className="border-t border-line pt-5">
                 <DescriptionList
                   items={[
-                    { label: "Role", value: <span className="capitalize">{me.role} · {me.organizationName}</span> },
+                    {
+                      label: "Role",
+                      value: (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge tone={roleTone(me.role)}>{roleLabel(me.role)}</Badge>
+                          <span className="font-normal text-muted">{me.orgName}</span>
+                        </div>
+                      ),
+                    },
                     { label: "Member since", value: formatDate(me.createdAt) },
                   ]}
                 />

@@ -16,6 +16,10 @@ import (
 	authstore "github.com/ryuga/ryugaware/backend/internal/modules/auth/store"
 	notificationrepo "github.com/ryuga/ryugaware/backend/internal/modules/notification/repository"
 	notificationservice "github.com/ryuga/ryugaware/backend/internal/modules/notification/service"
+	"github.com/ryuga/ryugaware/backend/internal/modules/templates"
+	templateshandler "github.com/ryuga/ryugaware/backend/internal/modules/templates/handler"
+	templatesrepo "github.com/ryuga/ryugaware/backend/internal/modules/templates/repository"
+	templatesservice "github.com/ryuga/ryugaware/backend/internal/modules/templates/service"
 	"github.com/ryuga/ryugaware/backend/internal/platform/database"
 	"github.com/ryuga/ryugaware/backend/internal/platform/email"
 	"github.com/ryuga/ryugaware/backend/internal/platform/messaging"
@@ -102,8 +106,13 @@ func registerModules(
 		mailer{sender: email.New(cfg.SMTP)},
 	)
 
+	templatesHandler := templateshandler.New(templatesservice.New(templatesrepo.New(db)))
+
+	authenticator := auth.NewAuthenticator(authSvc)
+
 	v1 := router.Group("/api/v1")
-	auth.RegisterRoutes(v1, authHandler, auth.NewAuthenticator(authSvc))
+	auth.RegisterRoutes(v1, authHandler, authenticator)
+	templates.RegisterRoutes(v1, templatesHandler, authenticator)
 	registerHealth(router, db, rdb)
 
 	if cfg.Auth.BootstrapAdminEmail != "" {

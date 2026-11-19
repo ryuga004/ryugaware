@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,16 +20,17 @@ type Body struct {
 }
 
 type CursorMeta struct {
-	NextCursor string `json:"next_cursor,omitempty"`
-	HasMore    bool   `json:"has_more"`
-	PageSize   int    `json:"page_size"`
+	NextCursor string `json:"nextCursor,omitempty"`
+	HasMore    bool   `json:"hasMore"`
+	PageSize   int    `json:"pageSize"`
 }
 
 type PageMeta struct {
-	Page       int   `json:"page"`
-	PageSize   int   `json:"page_size"`
-	TotalItems int64 `json:"total_items"`
-	TotalPages int   `json:"total_pages"`
+	Page        int       `json:"page"`
+	PageSize    int       `json:"pageSize"`
+	Total       int64     `json:"total"`
+	TotalPages  int       `json:"totalPages"`
+	RequestedAt time.Time `json:"requestedAt"`
 }
 
 const ProblemContentType = "application/problem+json; charset=utf-8"
@@ -58,7 +60,13 @@ func NewPageMeta(page, pageSize int, total int64) *PageMeta {
 		pageSize = 1
 	}
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
-	return &PageMeta{Page: page, PageSize: pageSize, TotalItems: total, TotalPages: totalPages}
+	return &PageMeta{
+		Page:        page,
+		PageSize:    pageSize,
+		Total:       total,
+		TotalPages:  totalPages,
+		RequestedAt: time.Now().UTC(),
+	}
 }
 
 func NewCursorMeta(nextCursor string, pageSize int) *CursorMeta {

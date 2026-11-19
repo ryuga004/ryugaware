@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 type RequestOTP struct {
 	Email string `json:"email" binding:"required,max=254"`
 }
@@ -63,18 +65,30 @@ type Authenticated struct {
 }
 
 type CurrentUser struct {
-	ID         string   `json:"id"`
-	FullName   string   `json:"fullName"`
-	Email      string   `json:"email"`
-	OrgName    string   `json:"orgName"`
-	TenantID   string   `json:"tenantId"`
-	Role       string   `json:"role"`
-	Privileges []string `json:"privileges"`
+	ID                string    `json:"id"`
+	FullName          string    `json:"fullName"`
+	Email             string    `json:"email"`
+	OrgName           string    `json:"orgName"`
+	TenantID          string    `json:"tenantId"`
+	Role              string    `json:"role"`
+	Privileges        []string  `json:"privileges"`
+	CreatedAt         time.Time `json:"createdAt"`
+	PasswordChangedAt time.Time `json:"passwordChangedAt"`
 }
 
 type Me struct {
 	Authenticated bool         `json:"authenticated"`
 	User          *CurrentUser `json:"user"`
+}
+
+type License struct {
+	Plan         string    `json:"plan"`
+	Status       string    `json:"status"`
+	Allowance    int       `json:"allowance"`
+	Used         int       `json:"used"`
+	Remaining    int       `json:"remaining"`
+	LimitReached bool      `json:"limitReached"`
+	ValidUntil   time.Time `json:"validUntil"`
 }
 
 type Refreshed struct {

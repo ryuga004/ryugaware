@@ -30,7 +30,7 @@ export function TemplatePreviewModal() {
       footer={
         t && (
           <>
-            <a href={t.previewUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-md border border-line-strong bg-surface px-3.5 text-sm font-medium hover:bg-subtle">
+            <a href={`/preview/${t.id}`} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 rounded-md border border-line-strong bg-surface px-3.5 text-sm font-medium hover:bg-subtle">
               Open live preview <ExternalLink className="size-4" aria-hidden />
             </a>
             <Button

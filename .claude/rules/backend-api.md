@@ -84,8 +84,9 @@ members: `code` (the stable `apperrors` identifier clients switch on), `errors` 
 ## 3. DTOs
 
 - Every endpoint has an explicit request DTO and response DTO in the module's `dto/` package.
-- Explicit JSON tags on every field, **`snake_case`**, including on nested structs. No reliance on Go
-  field names.
+- Explicit JSON tags on every field, **`camelCase`**, including on nested structs. No reliance on Go
+  field names. The one exception is the RFC 9457 problem document, whose `request_id` extension member
+  keeps its snake_case spelling because that is what the frontend's `baseApi` already parses.
 - **Never bind into a GORM model and never return one.** Models carry columns the client must not see
   or set (`password_hash`, `tenant_id`, `role_id`, `is_active`, internal timestamps).
 - Mass assignment: a request DTO contains only fields the caller is allowed to set. Ownership and
@@ -133,7 +134,7 @@ if err := c.ShouldBindJSON(&in); err != nil {
 ## 5. Pagination
 
 **Collections are cursor-paginated by default** — `response.CursorMeta`:
-`{"next_cursor","has_more","page_size"}`, built with `response.NewCursorMeta`.
+`{"nextCursor","hasMore","pageSize"}`, built with `response.NewCursorMeta`.
 
 - The cursor is **opaque**: base64url of the last row's sort key plus its `id`, plus a fingerprint of
   the filter and order it was issued for. Clients echo it back and never construct one.
@@ -148,8 +149,9 @@ if err := c.ShouldBindJSON(&in); err != nil {
 - Put the cursor codec in `internal/shared/pagination` when the first cursor endpoint lands — one
   implementation, not one per module.
 
-Page numbers (`response.PageMeta`, `{"page","page_size","total_items","total_pages"}`) are the
+Page numbers (`response.PageMeta`, `{"page","pageSize","total","totalPages","requestedAt"}`) are the
 **documented exception**, for endpoints whose UI genuinely needs a total count or random page access.
+`requestedAt` is the server clock at response time, which list screens show as "updated at".
 Using it requires a line in `PROJECT_STATE.md` → **HTTP surface** saying why, and the count query must
 carry the same filters and the same tenant predicate as the page query.
 

@@ -10,7 +10,7 @@ import { Button, IconButton } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useGetMeQuery } from "@/features/account/api";
+import { useCurrentUser } from "@/features/auth/hooks";
 import { pushToast } from "@/features/ui/slice";
 import { isApiError } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
@@ -26,7 +26,7 @@ export function SettingsPage() {
   const dirty = useAppSelector(selectIsDirty);
   const { data: org, isLoading, isError, refetch, isFetching } = useGetOrganizationQuery();
   const { data: options } = useGetSettingsOptionsQuery();
-  const { data: me } = useGetMeQuery();
+  const { user: me } = useCurrentUser();
   const [save, { isLoading: saving }] = useUpdateOrganizationMutation();
   const [serverErrors, setServerErrors] = useState<Partial<Record<keyof OrganizationEditable, string>>>({});
 

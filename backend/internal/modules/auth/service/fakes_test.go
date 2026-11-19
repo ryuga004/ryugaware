@@ -143,6 +143,15 @@ func (f *fakeRepo) PrivilegeNames(ctx context.Context, roleID uuid.UUID) ([]stri
 	return []string{"websites.read", "websites.write"}, nil
 }
 
+func (f *fakeRepo) GetLicense(ctx context.Context, tenantID uuid.UUID) (*model.License, error) {
+	for _, l := range f.licenses {
+		if l.TenantID == tenantID {
+			return l, nil
+		}
+	}
+	return nil, nil
+}
+
 func (f *fakeRepo) CreateLicense(ctx context.Context, tx repository.Tx, l *model.License) error {
 	f.licenses = append(f.licenses, l)
 	return nil

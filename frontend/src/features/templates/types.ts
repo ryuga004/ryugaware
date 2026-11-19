@@ -1,6 +1,13 @@
 import type { Paginated } from "@/lib/api/types";
 
-export type TemplateCategory = "ecommerce" | "services";
+/** `template_categories.slug` on the backend; the tab list and labels come from the list response. */
+export type TemplateCategory =
+  | "ecommerce"
+  | "food_delivery"
+  | "restaurant"
+  | "services"
+  | "portfolio"
+  | "education";
 
 export interface Template {
   id: string;
@@ -12,7 +19,6 @@ export interface Template {
   features: string[];
   paymentMethods: string[];
   thumbnailTheme: string;
-  previewUrl: string;
   version: string;
   status: "published" | "draft";
   createdAt: string;

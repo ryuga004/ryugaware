@@ -49,13 +49,15 @@ func (h *Handler) Me(c *gin.Context) {
 	response.OK(c, dto.Me{
 		Authenticated: true,
 		User: &dto.CurrentUser{
-			ID:         current.User.ID.String(),
-			FullName:   current.User.FullName,
-			Email:      current.User.Email,
-			OrgName:    current.Tenant.Name,
-			TenantID:   current.Tenant.ID.String(),
-			Role:       current.Role,
-			Privileges: current.Privileges,
+			ID:                current.User.ID.String(),
+			FullName:          current.User.FullName,
+			Email:             current.User.Email,
+			OrgName:           current.Tenant.Name,
+			TenantID:          current.Tenant.ID.String(),
+			Role:              current.Role,
+			Privileges:        current.Privileges,
+			CreatedAt:         current.User.CreatedAt,
+			PasswordChangedAt: current.User.PasswordChangedAt,
 		},
 	})
 }

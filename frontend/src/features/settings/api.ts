@@ -81,7 +81,7 @@ export const settingsApi = baseApi.injectEndpoints({
     changePassword: build.mutation<{ passwordChangedAt: string; signedOutSessions: number }, ChangePasswordInput>({
       query: (body) => ({ url: "/account/password", method: "POST", body }),
       transformResponse: unwrap<{ passwordChangedAt: string; signedOutSessions: number }>,
-      invalidatesTags: ["Session", "Me"],
+      invalidatesTags: ["Session", "Auth"],
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;

@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { ChevronsUpDown, LogOut, User as UserIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useGetMeQuery } from "@/features/account/api";
 import { useLogoutMutation } from "@/features/auth/api";
+import { useCurrentUser } from "@/features/auth/hooks";
 import { cn } from "@/lib/cn";
 import { ActionMenu } from "./ActionMenu";
 
@@ -13,7 +13,7 @@ import { ActionMenu } from "./ActionMenu";
 export function UserMenu({ variant = "full", side = "top" }: { variant?: "full" | "compact"; side?: "top" | "bottom" }) {
   const router = useRouter();
   const [logout] = useLogoutMutation();
-  const { data: user, isLoading } = useGetMeQuery();
+  const { user, isLoading } = useCurrentUser();
 
   const name = user?.fullName ?? "";
   const items = [
