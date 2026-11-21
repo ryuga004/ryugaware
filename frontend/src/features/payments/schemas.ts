@@ -28,8 +28,6 @@ export function makePaymentMethodSchema({ editing }: { editing: boolean }) {
       maxOrder: z.string().trim(),
       keyId: z.string().trim(),
       keySecret: z.string().trim(),
-      appliesTo: z.enum(["all", "selected"]),
-      websiteIds: z.array(z.string()),
       enabled: z.boolean(),
     })
     .superRefine((v, ctx) => {
@@ -54,7 +52,6 @@ export function makePaymentMethodSchema({ editing }: { editing: boolean }) {
         if (!editing && !v.keyId) issue("keyId", "Paste the key ID from your gateway dashboard.");
         if (!editing && !v.keySecret) issue("keySecret", "Paste the key secret from your gateway dashboard.");
       }
-      if (v.appliesTo === "selected" && v.websiteIds.length === 0) issue("websiteIds", "Choose at least one website.");
     })
     .transform(
       (v): PaymentMethodInput => ({
@@ -68,8 +65,6 @@ export function makePaymentMethodSchema({ editing }: { editing: boolean }) {
         maxOrder: v.type === "cod" ? toNumber(v.maxOrder) : null,
         keyId: v.type === "cod" || !v.keyId ? undefined : v.keyId,
         keySecret: v.type === "cod" || !v.keySecret ? undefined : v.keySecret,
-        appliesTo: v.appliesTo,
-        websiteIds: v.appliesTo === "all" ? [] : v.websiteIds,
         enabled: v.enabled,
       }),
     );
@@ -89,5 +84,4 @@ export const PAYMENT_METHOD_FIELDS = [
   "maxOrder",
   "keyId",
   "keySecret",
-  "websiteIds",
 ] as const;

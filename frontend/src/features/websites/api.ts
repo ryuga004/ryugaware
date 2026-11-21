@@ -2,6 +2,7 @@ import { baseApi } from "@/lib/api/baseApi";
 import { getErrorMessage, isApiError, type Single } from "@/lib/api/types";
 import { pushToast } from "@/features/ui/slice";
 import type {
+  Asset,
   CreateWebsiteInput,
   SubdomainCheck,
   UpdateWebsiteInput,
@@ -47,6 +48,16 @@ export const websitesApi = baseApi.injectEndpoints({
       query: (subdomain) => ({ url: "/websites/check-subdomain", params: { subdomain } }),
       transformResponse: unwrap<SubdomainCheck>,
       keepUnusedDataFor: 30,
+    }),
+
+    uploadAsset: build.mutation<Asset, { websiteId: string; file: File }>({
+      query: ({ websiteId, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return { url: `/websites/${websiteId}/assets`, method: "POST", body };
+      },
+      transformResponse: unwrap<Asset>,
+      invalidatesTags: ["StorageConfig"],
     }),
 
     createWebsite: build.mutation<Website, CreateWebsiteInput>({
@@ -124,6 +135,7 @@ export const websitesApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useUploadAssetMutation,
   useGetWebsitesQuery,
   useGetWebsiteQuery,
   useGetWebsiteOptionsQuery,

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/features/websites/components/StatusBadge";
-import { useGetWebsiteQuery, useUpdateWebsiteMutation } from "@/features/websites/api";
+import { useGetWebsiteQuery, useUpdateWebsiteMutation, useUploadAssetMutation } from "@/features/websites/api";
 import { useGetStoreSettingsQuery, useUpdateStoreSettingsMutation } from "@/features/website-settings/api";
 import { toCommerce } from "@/features/website-settings/commerce";
 import { pushToast } from "@/features/ui/slice";
@@ -22,6 +22,7 @@ import type { SiteContent } from "../../types";
 import { DeviceFrame, DeviceSwitcher, type Device } from "../DeviceFrame";
 import { Storefront } from "../Storefront";
 import { CHROME, EditorPanel, type EditorView, type PanelActions } from "./EditorPanel";
+import { AssetUploadProvider } from "./FieldsForm";
 
 /**
  * The website editor: a form panel on the left, the real storefront on the right.
@@ -39,6 +40,12 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
   const storeSettings = useGetStoreSettingsQuery(websiteId);
   const [updateStoreSettings] = useUpdateStoreSettingsMutation();
   const [save, { isLoading: saving }] = useSaveSiteContentMutation();
+  const [uploadAsset] = useUploadAssetMutation();
+
+  const upload = useCallback(
+    async (file: File) => (await uploadAsset({ websiteId, file }).unwrap()).url,
+    [uploadAsset, websiteId],
+  );
   const [updateWebsite, { isLoading: publishing }] = useUpdateWebsiteMutation();
 
   // The draft only exists once something has been edited; until then the loaded content is shown.
@@ -186,18 +193,20 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
       <div className="flex min-h-0 flex-1">
         <aside className={cn("w-full shrink-0 overflow-y-auto border-line bg-page md:w-[348px] md:border-r", tab === "preview" && "max-md:hidden")}>
           {site && manifest ? (
-            <EditorPanel
-              site={site}
-              manifest={manifest}
-              view={view}
-              onView={changeView}
-              actions={actions}
-              store={{
-                settings: storeSettings.data,
-                loading: storeSettings.isLoading,
-                update: (patch) => updateStoreSettings({ websiteId, patch }),
-              }}
-            />
+            <AssetUploadProvider value={upload}>
+              <EditorPanel
+                site={site}
+                manifest={manifest}
+                view={view}
+                onView={changeView}
+                actions={actions}
+                store={{
+                  settings: storeSettings.data,
+                  loading: storeSettings.isLoading,
+                  update: (patch) => updateStoreSettings({ websiteId, patch }),
+                }}
+              />
+            </AssetUploadProvider>
           ) : (
             <div className="space-y-2 p-4">
               <Skeleton className="h-12 w-full" />

@@ -87,7 +87,7 @@ function ShipmentDrawerBody({ shipmentId }: { shipmentId: string }) {
       ) : (
         <div className="flex flex-col gap-6">
           <div className="flex items-center gap-3">
-            <DeliveryMark type={s.methodType} carrier={s.carrier} />
+            <DeliveryMark type={s.methodType} />
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-ink">{s.methodName}</p>
               <p className="truncate text-xs text-muted">{s.carrier === "Self" ? "Your own staff" : s.carrier}</p>

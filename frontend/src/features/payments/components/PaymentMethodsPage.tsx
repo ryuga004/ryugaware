@@ -13,11 +13,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Switch } from "@/components/ui/Switch";
-import { WebsiteSelect } from "@/features/websites/components/WebsiteSelect";
 import { cn } from "@/lib/cn";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { paymentsApi, useGetPaymentMethodsQuery, useSetPaymentMethodEnabledMutation } from "../api";
-import { formatAvailability, formatMethodFees, METHOD_MODE, METHOD_PAGE_SIZES, methodMode, PAYMENT_PROVIDER, PAYMENT_TYPE, PAYMENT_TYPE_OPTIONS } from "../constants";
+import { formatMethodFees, METHOD_MODE, METHOD_PAGE_SIZES, methodMode, PAYMENT_PROVIDER, PAYMENT_TYPE, PAYMENT_TYPE_OPTIONS } from "../constants";
 import {
   clearMethodFilters,
   openAddMethod,
@@ -29,7 +28,6 @@ import {
   setMethodPageSize,
   setMethodSearch,
   setMethodType,
-  setMethodWebsite,
 } from "../slice";
 import type { PaymentMethod } from "../types";
 import { DeleteMethodDialog } from "./DeleteMethodDialog";
@@ -86,15 +84,6 @@ export function PaymentMethodsPage() {
     { key: "type", header: "Type", cell: (m) => <Badge tone="neutral">{PAYMENT_TYPE[m.type].label}</Badge> },
     { key: "fees", header: "Fees", cell: (m) => <span className="text-body tabular-nums">{formatMethodFees(m)}</span> },
     { key: "mode", header: "Mode", cell: (m) => <StatusBadge value={methodMode(m)} map={METHOD_MODE} /> },
-    {
-      key: "available",
-      header: "Available on",
-      cell: (m) => (
-        <span className="text-body" title={m.appliesTo === "selected" ? m.websiteNames.join(", ") : undefined}>
-          {formatAvailability(m)}
-        </span>
-      ),
-    },
     { key: "enabled", header: "Enabled", cell: enabledSwitch },
     { key: "actions", header: <span className="sr-only">Actions</span>, align: "right", className: "w-[96px]", cell: rowActions },
   ];
@@ -126,7 +115,6 @@ export function PaymentMethodsPage() {
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
             <SearchInput value={filters.search} onChange={onSearch} placeholder="Search methods" />
             <div className="flex flex-col gap-3 sm:flex-row">
-              <WebsiteSelect value={filters.websiteId} onChange={(v) => dispatch(setMethodWebsite(v))} label="Filter by website" className="sm:w-48" />
               <FilterSelect label="Filter by type" value={filters.type} options={PAYMENT_TYPE_OPTIONS} onChange={(v) => dispatch(setMethodType(v))} />
             </div>
             {hasFilters && (
@@ -181,7 +169,7 @@ export function PaymentMethodsPage() {
                           <span className="text-xs text-muted tabular-nums">{formatMethodFees(m)}</span>
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
-                          <p className="min-w-0 truncate text-xs text-muted">{formatAvailability(m)}</p>
+                          <p className="min-w-0 truncate text-xs text-muted">{PAYMENT_PROVIDER[m.provider].label}</p>
                           {rowActions(m)}
                         </div>
                       </li>

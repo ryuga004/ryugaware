@@ -83,8 +83,15 @@ type Policy struct {
 	PublicBaseURL        string
 }
 
+// WebsiteCounter is satisfied by the websites module, which owns the websites table. Declared here
+// because the licence lives in auth, so auth is the consumer that needs the count.
+type WebsiteCounter interface {
+	CountForTenant(ctx context.Context, tenantID uuid.UUID) (int64, error)
+}
+
 type Service struct {
 	repo      Repo
+	websites  WebsiteCounter
 	cache     Cache
 	events    Publisher
 	policy    Policy
@@ -109,6 +116,12 @@ func New(repo Repo, cache Cache, events Publisher, policy Policy) *Service {
 		randOTP:   randomOTP,
 		dummyHash: string(dummy),
 	}
+}
+
+// WithWebsiteCounter is set after construction because websites is wired after auth.
+func (s *Service) WithWebsiteCounter(counter WebsiteCounter) *Service {
+	s.websites = counter
+	return s
 }
 
 func (s *Service) WithClock(now func() time.Time) *Service {

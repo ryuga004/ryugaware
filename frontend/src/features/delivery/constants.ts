@@ -4,6 +4,7 @@ import { formatMoney } from "@/lib/format";
 import type {
   CoverageType,
   DeliveryMethod,
+  DeliveryPartner,
   DeliveryType,
   RateType,
   ShipmentAction,
@@ -26,18 +27,22 @@ export const DELIVERY_TYPE_OPTIONS: { value: DeliveryType; label: string }[] = [
 ];
 
 /** Sensible defaults when the merchant picks a type in the add drawer. */
-export const DELIVERY_TYPE_DEFAULTS: Record<DeliveryType, { name: string; carrier: string; minDays: number; maxDays: number; rateType: RateType; price: number; coverage: CoverageType }> = {
-  standard: { name: "Standard delivery", carrier: "Delhivery", minDays: 3, maxDays: 5, rateType: "flat", price: 60, coverage: "all_india" },
-  express: { name: "Express delivery", carrier: "Blue Dart", minDays: 1, maxDays: 2, rateType: "flat", price: 149, coverage: "all_india" },
-  same_day: { name: "Same-day delivery", carrier: "Local partner", minDays: 0, maxDays: 0, rateType: "flat", price: 99, coverage: "metro" },
-  pickup: { name: "Store pickup", carrier: "Self", minDays: 0, maxDays: 0, rateType: "free", price: 0, coverage: "pincodes" },
+export const DELIVERY_TYPE_DEFAULTS: Record<DeliveryType, { name: string; partner: DeliveryPartner; minDays: number; maxDays: number; rateType: RateType; price: number; coverage: CoverageType }> = {
+  standard: { name: "Standard delivery", partner: "shiprocket", minDays: 3, maxDays: 5, rateType: "flat", price: 60, coverage: "all_india" },
+  express: { name: "Express delivery", partner: "shiprocket", minDays: 1, maxDays: 2, rateType: "flat", price: 149, coverage: "all_india" },
+  same_day: { name: "Same-day delivery", partner: "self", minDays: 0, maxDays: 0, rateType: "flat", price: 99, coverage: "metro" },
+  pickup: { name: "Store pickup", partner: "pickup", minDays: 0, maxDays: 0, rateType: "free", price: 0, coverage: "pincodes" },
 };
 
-export const CARRIERS = ["Delhivery", "Blue Dart", "DTDC", "Ecom Express", "Shadowfax", "XpressBees", "India Post", "Local partner", "Self"] as const;
+export const DELIVERY_PARTNER: Record<DeliveryPartner, { label: string; description: string }> = {
+  shiprocket: { label: "Shiprocket", description: "Hand parcels to Shiprocket's courier network." },
+  self: { label: "Own fleet", description: "Your own staff deliver the order." },
+  pickup: { label: "Store pickup", description: "The customer collects from your store." },
+};
 
-export const CARRIER_OPTIONS: SelectOption[] = CARRIERS.map((c) => ({
+export const PARTNER_OPTIONS: SelectOption[] = (Object.keys(DELIVERY_PARTNER) as DeliveryPartner[]).map((c) => ({
   value: c,
-  label: c === "Self" ? "Self (your own staff or store)" : c === "Local partner" ? "Local partner (city couriers)" : c,
+  label: DELIVERY_PARTNER[c].label,
 }));
 
 export const RATE_TYPE_OPTIONS: { value: RateType; label: string }[] = [
@@ -98,19 +103,12 @@ export function formatCoverage(m: Pick<DeliveryMethod, "coverage" | "regions">) 
   return list.length <= 2 ? list.join(", ") : `${list.length} ${noun}`;
 }
 
-export function formatAvailability(m: Pick<DeliveryMethod, "websiteIds" | "websiteNames">) {
-  if (m.websiteIds.length === 0) return "All websites";
-  if (m.websiteNames.length === 1) return m.websiteNames[0]!;
-  return `${m.websiteNames.length} websites`;
-}
-
 /** Artwork for a delivery type (192×128 webp). */
 export const typeMark = (type: DeliveryType) => `/images/marks/delivery-${type === "same_day" ? "same-day" : type}.webp`;
 
-/** Carrier artwork: local couriers and self-delivery have their own marks, named carriers use the method type. */
-export function carrierMark(carrier: string, type: DeliveryType) {
-  if (carrier === "Self") return "/images/marks/carrier-self.webp";
-  if (carrier === "Local partner" || carrier === "Local couriers") return "/images/marks/carrier-local.webp";
+/** Partner artwork: own fleet and store pickup have their own marks, couriers use the method type. */
+export function partnerMark(partner: DeliveryPartner, type: DeliveryType) {
+  if (partner === "self" || partner === "pickup") return "/images/marks/carrier-self.webp";
   return typeMark(type);
 }
 

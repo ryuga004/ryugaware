@@ -26,7 +26,7 @@ export const deliveryApi = baseApi.injectEndpoints({
     getDeliveryMethods: build.query<DeliveryMethodsResponse, DeliveryMethodFilters>({
       query: (f) => ({
         url: "/delivery/methods",
-        params: { search: f.search || undefined, websiteId: f.websiteId, status: f.status, page: f.page, pageSize: f.pageSize },
+        params: { search: f.search || undefined, status: f.status, page: f.page, pageSize: f.pageSize },
       }),
       providesTags: (res) => [METHOD_LIST, ...(res?.data ?? []).map((m) => ({ type: "DeliveryMethod" as const, id: m.id }))],
     }),
@@ -134,7 +134,7 @@ export const deliveryApi = baseApi.injectEndpoints({
     getShipments: build.query<ShipmentsResponse, ShipmentFilters>({
       query: (f) => ({
         url: "/shipments",
-        params: { search: f.search || undefined, status: f.status, methodType: f.methodType, websiteId: f.websiteId, page: f.page, pageSize: f.pageSize },
+        params: { search: f.search || undefined, status: f.status, methodType: f.methodType, page: f.page, pageSize: f.pageSize },
       }),
       providesTags: (res) => [SHIPMENT_LIST, ...(res?.data ?? []).map((s) => ({ type: "Shipment" as const, id: s.id }))],
     }),

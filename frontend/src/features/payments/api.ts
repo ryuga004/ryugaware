@@ -23,7 +23,7 @@ export const paymentsApi = baseApi.injectEndpoints({
     getPaymentMethods: build.query<PaymentMethodsResponse, PaymentMethodFilters>({
       query: (f) => ({
         url: "/payments/methods",
-        params: { search: f.search || undefined, type: f.type, websiteId: f.websiteId, page: f.page, pageSize: f.pageSize },
+        params: { search: f.search || undefined, type: f.type, page: f.page, pageSize: f.pageSize },
       }),
       providesTags: (res) => [METHOD_LIST, ...(res?.data ?? []).map((m) => ({ type: "PaymentMethod" as const, id: m.id }))],
     }),

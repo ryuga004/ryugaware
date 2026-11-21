@@ -9,7 +9,6 @@ import deliveryReducer from "@/features/delivery/slice";
 import domainsReducer from "@/features/domains/slice";
 import paymentsReducer from "@/features/payments/slice";
 import settingsReducer from "@/features/settings/slice";
-import storageReducer from "@/features/storage/slice";
 import templatesReducer from "@/features/templates/slice";
 import uiReducer from "@/features/ui/slice";
 import websitesReducer from "@/features/websites/slice";
@@ -30,7 +29,6 @@ const appReducer = combineSlices(baseApi, {
   payments: paymentsReducer,
   delivery: deliveryReducer,
   customers: customersReducer,
-  storage: storageReducer,
   customerAuth: customerAuthReducer,
   contact: contactReducer,
 });

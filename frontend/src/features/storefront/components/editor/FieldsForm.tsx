@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { FormField } from "@/components/platform/FormField";
 import { ImageUpload } from "@/components/platform/ImageUpload";
+import { createContext, useContext } from "react";
 import { Button, IconButton } from "@/components/ui/Button";
 import { ColorInput } from "@/components/ui/ColorInput";
 import { Input } from "@/components/ui/Input";
@@ -17,6 +18,13 @@ import type { FieldDef, SitePage } from "../../types";
  * This is why a new template needs no editor code: the manifest says a hero has a heading, an
  * image and a link, and the right controls appear. The renderer reads the same values back.
  */
+type Uploader = (file: File) => Promise<string>;
+
+const UploadContext = createContext<Uploader | undefined>(undefined);
+
+/** Supplies the editor's asset uploader to every `image` field below it. */
+export const AssetUploadProvider = UploadContext.Provider;
+
 export function FieldsForm({
   fields,
   values,
@@ -53,6 +61,7 @@ function Field({
   onChange: (value: unknown) => void;
   onError?: (message: string) => void;
 }) {
+  const upload = useContext(UploadContext);
   const text = typeof value === "string" ? value : "";
 
   if (field.type === "boolean") {
@@ -101,7 +110,7 @@ function Field({
           case "color":
             return <ColorInput {...control} value={text} onChange={onChange} />;
           case "image":
-            return <ImageUpload id={control.id} value={text || null} onChange={(v) => onChange(v ?? "")} onError={onError} />;
+            return <ImageUpload id={control.id} value={text || null} onChange={(v) => onChange(v ?? "")} onError={onError} upload={upload} />;
           case "link":
             return <LinkField {...control} value={text} pages={pages} onChange={onChange} />;
           default:

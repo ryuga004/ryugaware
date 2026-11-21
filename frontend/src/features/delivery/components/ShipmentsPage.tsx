@@ -87,7 +87,7 @@ export function ShipmentsPage() {
       header: "Method",
       cell: (s) => (
         <div className="flex min-w-0 items-center gap-2.5">
-          <DeliveryMark type={s.methodType} carrier={s.carrier} size="sm" />
+          <DeliveryMark type={s.methodType} size="sm" />
           <div className="min-w-0">
             <p className="truncate text-ink">{s.methodName}</p>
             <p className="truncate text-xs text-muted">{s.carrier === "Self" ? "Your own staff" : s.carrier}</p>
@@ -175,7 +175,7 @@ export function ShipmentsPage() {
                       <StatusBadge value={s.status} map={SHIPMENT_STATUS} />
                     </div>
                     <div className="mt-3 flex items-center gap-2.5">
-                      <DeliveryMark type={s.methodType} carrier={s.carrier} size="sm" />
+                      <DeliveryMark type={s.methodType} size="sm" />
                       <div className="min-w-0 text-sm">
                         <p className="truncate text-ink">
                           {s.customerName} · {s.destination.city}

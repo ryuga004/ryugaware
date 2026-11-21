@@ -12,11 +12,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Switch } from "@/components/ui/Switch";
-import { WebsiteSelect } from "@/features/websites/components/WebsiteSelect";
 import { cn } from "@/lib/cn";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useAddRecommendedMethodsMutation, useGetDeliveryMethodsQuery, useUpdateDeliveryMethodMutation } from "../api";
-import { METHOD_PAGE_SIZES, METHOD_STATUS_OPTIONS, formatAvailability, formatCoverage, formatDeliveryTime, formatFee } from "../constants";
+import { METHOD_PAGE_SIZES, METHOD_STATUS_OPTIONS, formatCoverage, formatDeliveryTime, formatFee } from "../constants";
 import {
   clearMethodFilters,
   openAddMethod,
@@ -28,7 +27,6 @@ import {
   setMethodPageSize,
   setMethodSearch,
   setMethodStatus,
-  setMethodWebsite,
 } from "../slice";
 import type { DeliveryMethod } from "../types";
 import { DeleteMethodDialog } from "./DeleteMethodDialog";
@@ -75,7 +73,7 @@ export function DeliveryMethodsPage() {
             <button type="button" onClick={() => dispatch(openEditMethod(m.id))} className="block max-w-full truncate text-left font-medium text-ink hover:underline">
               {m.name}
             </button>
-            <p className="truncate text-xs text-muted">{m.carrier === "Self" ? "Your own staff" : m.carrier}</p>
+            <p className="truncate text-xs text-muted">{m.partnerLabel}</p>
           </div>
         </div>
       ),
@@ -83,15 +81,7 @@ export function DeliveryMethodsPage() {
     { key: "time", header: "Delivery time", cell: (m) => <span className="whitespace-nowrap text-body">{formatDeliveryTime(m)}</span> },
     { key: "fee", header: "Fee", cell: (m) => <span className="text-ink tabular-nums">{formatFee(m)}</span> },
     { key: "coverage", header: "Coverage", cell: (m) => <span className="text-body">{formatCoverage(m)}</span> },
-    {
-      key: "websites",
-      header: "Available on",
-      cell: (m) => (
-        <span className="text-body" title={m.websiteNames.join(", ") || undefined}>
-          {formatAvailability(m)}
-        </span>
-      ),
-    },
+    { key: "partner", header: "Partner", cell: (m) => <span className="text-body">{m.partnerLabel}</span> },
     { key: "enabled", header: "Enabled", cell: enabledSwitch },
     { key: "actions", header: <span className="sr-only">Actions</span>, align: "right", className: "w-[96px]", cell: rowActions },
   ];
@@ -121,9 +111,8 @@ export function DeliveryMethodsPage() {
       ) : (
         <>
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-            <SearchInput value={filters.search} onChange={onSearch} placeholder="Search methods or carriers" />
+            <SearchInput value={filters.search} onChange={onSearch} placeholder="Search methods" />
             <div className="flex flex-col gap-3 sm:flex-row">
-              <WebsiteSelect value={filters.websiteId} onChange={(v) => dispatch(setMethodWebsite(v))} label="Filter by website" className="sm:w-48" />
               <FilterSelect label="Filter by status" value={filters.status} options={METHOD_STATUS_OPTIONS} onChange={(v) => dispatch(setMethodStatus(v))} />
             </div>
             {hasFilters && (
@@ -183,7 +172,7 @@ export function DeliveryMethodsPage() {
                               {m.name}
                             </button>
                             <p className="truncate text-xs text-muted">
-                              {m.carrier === "Self" ? "Your own staff" : m.carrier} · {formatDeliveryTime(m)}
+                              {m.partnerLabel} · {formatDeliveryTime(m)}
                             </p>
                           </div>
                           {enabledSwitch(m)}
@@ -199,8 +188,8 @@ export function DeliveryMethodsPage() {
                           </div>
                           <div className="col-span-2 flex items-end justify-between gap-2">
                             <div>
-                              <dt className="text-xs text-muted">Available on</dt>
-                              <dd className="text-ink">{formatAvailability(m)}</dd>
+                              <dt className="text-xs text-muted">Partner</dt>
+                              <dd className="text-ink">{m.partnerLabel}</dd>
                             </div>
                             {rowActions(m)}
                           </div>

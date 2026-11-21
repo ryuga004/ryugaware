@@ -14,16 +14,29 @@ import (
 	authrepo "github.com/ryuga/ryugaware/backend/internal/modules/auth/repository"
 	authservice "github.com/ryuga/ryugaware/backend/internal/modules/auth/service"
 	authstore "github.com/ryuga/ryugaware/backend/internal/modules/auth/store"
+	"github.com/ryuga/ryugaware/backend/internal/modules/delivery"
+	deliveryhandler "github.com/ryuga/ryugaware/backend/internal/modules/delivery/handler"
+	deliveryrepo "github.com/ryuga/ryugaware/backend/internal/modules/delivery/repository"
+	deliveryservice "github.com/ryuga/ryugaware/backend/internal/modules/delivery/service"
 	notificationrepo "github.com/ryuga/ryugaware/backend/internal/modules/notification/repository"
 	notificationservice "github.com/ryuga/ryugaware/backend/internal/modules/notification/service"
+	"github.com/ryuga/ryugaware/backend/internal/modules/payments"
+	paymentshandler "github.com/ryuga/ryugaware/backend/internal/modules/payments/handler"
+	paymentsrepo "github.com/ryuga/ryugaware/backend/internal/modules/payments/repository"
+	paymentsservice "github.com/ryuga/ryugaware/backend/internal/modules/payments/service"
 	"github.com/ryuga/ryugaware/backend/internal/modules/templates"
 	templateshandler "github.com/ryuga/ryugaware/backend/internal/modules/templates/handler"
 	templatesrepo "github.com/ryuga/ryugaware/backend/internal/modules/templates/repository"
 	templatesservice "github.com/ryuga/ryugaware/backend/internal/modules/templates/service"
+	"github.com/ryuga/ryugaware/backend/internal/modules/websites"
+	websiteshandler "github.com/ryuga/ryugaware/backend/internal/modules/websites/handler"
+	websitesrepo "github.com/ryuga/ryugaware/backend/internal/modules/websites/repository"
+	websitesservice "github.com/ryuga/ryugaware/backend/internal/modules/websites/service"
 	"github.com/ryuga/ryugaware/backend/internal/platform/database"
 	"github.com/ryuga/ryugaware/backend/internal/platform/email"
 	"github.com/ryuga/ryugaware/backend/internal/platform/messaging"
 	"github.com/ryuga/ryugaware/backend/internal/platform/redis"
+	"github.com/ryuga/ryugaware/backend/internal/platform/storage"
 )
 
 type modules struct {
@@ -107,12 +120,46 @@ func registerModules(
 	)
 
 	templatesHandler := templateshandler.New(templatesservice.New(templatesrepo.New(db)))
+	paymentsSvc := paymentsservice.New(paymentsrepo.New(db))
+	deliverySvc := deliveryservice.New(deliveryrepo.New(db))
+	paymentsHandler := paymentshandler.New(paymentsSvc)
+	deliveryHandler := deliveryhandler.New(deliverySvc)
+
+	mediaStore, err := storage.NewS3(storage.Config{
+		Region:         cfg.Storage.Region,
+		Bucket:         cfg.Storage.Bucket,
+		Endpoint:       cfg.Storage.Endpoint,
+		PublicEndpoint: cfg.Storage.PublicEndpoint,
+		AccessKey:      cfg.Storage.AccessKey,
+		SecretKey:      cfg.Storage.SecretKey,
+		UsePathStyle:   cfg.Storage.UsePathStyle,
+		PresignExpiry:  cfg.Storage.PresignExpiry,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	websitesSvc := websitesservice.New(
+		websitesrepo.New(db),
+		authSvc,
+		paymentsSvc,
+		deliverySvc,
+		mediaStore,
+	).WithAssetPolicy(websitesservice.AssetPolicy{
+		MaxBytes:    cfg.Storage.MaxUploadBytes,
+		AllowedMIME: cfg.Storage.AllowedMIME,
+	})
+	websitesHandler := websiteshandler.New(websitesSvc, websiteshandler.Config{})
+	authSvc.WithWebsiteCounter(websitesSvc)
 
 	authenticator := auth.NewAuthenticator(authSvc)
 
 	v1 := router.Group("/api/v1")
 	auth.RegisterRoutes(v1, authHandler, authenticator)
 	templates.RegisterRoutes(v1, templatesHandler, authenticator)
+	payments.RegisterRoutes(v1, paymentsHandler, authenticator)
+	delivery.RegisterRoutes(v1, deliveryHandler, authenticator)
+	websites.RegisterRoutes(v1, websitesHandler, authenticator)
 	registerHealth(router, db, rdb)
 
 	if cfg.Auth.BootstrapAdminEmail != "" {

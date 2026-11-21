@@ -3,32 +3,27 @@ import type { SelectOption } from "@/components/ui/Select";
 import { formatMoney } from "@/lib/format";
 import type { PaymentMethod, PaymentProvider, PaymentType, RevenueRange, TransactionRange, TransactionStatus } from "./types";
 
-export const PAYMENT_TYPES = ["card", "upi", "netbanking", "wallet", "cod"] as const satisfies readonly PaymentType[];
+export const PAYMENT_TYPES = ["cod", "upi", "card"] as const satisfies readonly PaymentType[];
 
 export const PAYMENT_TYPE: Record<PaymentType, { label: string; plural: string; mark: string; defaultName: string; defaultFee: number }> = {
   card: { label: "Card", plural: "Cards", mark: "/images/marks/payment-card.webp", defaultName: "Pay by card", defaultFee: 2 },
   upi: { label: "UPI", plural: "UPI", mark: "/images/marks/payment-upi.webp", defaultName: "UPI", defaultFee: 0 },
-  netbanking: { label: "Net banking", plural: "Net banking", mark: "/images/marks/payment-netbanking.webp", defaultName: "Net banking", defaultFee: 1.9 },
-  wallet: { label: "Wallet", plural: "Wallets", mark: "/images/marks/payment-wallet.webp", defaultName: "Wallet", defaultFee: 1.5 },
   cod: { label: "COD", plural: "Cash on delivery", mark: "/images/marks/payment-cod.webp", defaultName: "Cash on delivery", defaultFee: 0 },
 };
 
 export const PAYMENT_PROVIDER: Record<PaymentProvider, { label: string; keyIdLabel: string; keyIdPlaceholder: (test: boolean) => string }> = {
   razorpay: { label: "Razorpay", keyIdLabel: "API key ID", keyIdPlaceholder: (t) => (t ? "rzp_test_…" : "rzp_live_…") },
-  payu: { label: "PayU", keyIdLabel: "Merchant key", keyIdPlaceholder: () => "e.g. gtKFFx" },
-  cashfree: { label: "Cashfree", keyIdLabel: "App ID", keyIdPlaceholder: () => "e.g. 1234567abcdef" },
   phonepe: { label: "PhonePe", keyIdLabel: "Merchant ID", keyIdPlaceholder: () => "e.g. PGMERCHANT01" },
   paytm: { label: "Paytm", keyIdLabel: "Merchant ID", keyIdPlaceholder: () => "e.g. BLOOMS12345678" },
+  gpay: { label: "Google Pay", keyIdLabel: "Merchant ID", keyIdPlaceholder: () => "e.g. BCR2DN4T…" },
   offline: { label: "Collected by courier", keyIdLabel: "", keyIdPlaceholder: () => "" },
 };
 
 /** Gateways that can process each payment type (cash on delivery needs none). */
 export const TYPE_PROVIDERS: Record<PaymentType, PaymentProvider[]> = {
-  card: ["razorpay", "payu", "cashfree"],
-  upi: ["razorpay", "payu", "cashfree", "phonepe"],
-  netbanking: ["razorpay", "payu", "cashfree"],
-  wallet: ["paytm", "phonepe", "razorpay"],
   cod: ["offline"],
+  upi: ["phonepe", "paytm", "gpay"],
+  card: ["razorpay"],
 };
 
 export const PAYMENT_TYPE_OPTIONS: SelectOption<PaymentType | "all">[] = [
@@ -58,11 +53,7 @@ export function formatMethodFees(m: Pick<PaymentMethod, "type" | "feePercent" | 
 }
 
 /** "All websites", "Bloom Studio" or "2 websites". */
-export function formatAvailability(m: Pick<PaymentMethod, "appliesTo" | "websiteNames">) {
-  if (m.appliesTo === "all") return "All websites";
-  if (m.websiteNames.length === 1) return m.websiteNames[0]!;
-  return `${m.websiteNames.length} websites`;
-}
+
 
 export const TX_STATUS: StatusMap<TransactionStatus> = {
   succeeded: { label: "Succeeded", tone: "success" },

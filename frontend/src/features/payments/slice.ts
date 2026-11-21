@@ -33,7 +33,7 @@ interface PaymentsState {
   methodCounts: PaymentMethodCounts | null;
 }
 
-export const DEFAULT_METHOD_FILTERS: PaymentMethodFilters = { search: "", type: "all", websiteId: "all", page: 1, pageSize: 10 };
+export const DEFAULT_METHOD_FILTERS: PaymentMethodFilters = { search: "", type: "all", page: 1, pageSize: 10 };
 export const DEFAULT_TX_FILTERS: TransactionFilters = { search: "", status: "all", method: "all", websiteId: "all", range: "30d", page: 1, pageSize: 10 };
 export const DEFAULT_REVENUE_FILTERS: RevenueFilters = { range: "30d", websiteId: "all" };
 
@@ -59,10 +59,6 @@ const paymentsSlice = createSlice({
     },
     setMethodType(state, a: PayloadAction<PaymentType | "all">) {
       state.methodFilters.type = a.payload;
-      state.methodFilters.page = 1;
-    },
-    setMethodWebsite(state, a: PayloadAction<string>) {
-      state.methodFilters.websiteId = a.payload;
       state.methodFilters.page = 1;
     },
     setMethodPage(state, a: PayloadAction<number>) {
@@ -180,7 +176,7 @@ const paymentsSlice = createSlice({
   },
   selectors: {
     selectMethodFilters: (s) => s.methodFilters,
-    selectMethodHasFilters: (s) => s.methodFilters.search !== "" || s.methodFilters.type !== "all" || s.methodFilters.websiteId !== "all",
+    selectMethodHasFilters: (s) => s.methodFilters.search !== "" || s.methodFilters.type !== "all",
     selectMethodDrawer: (s) => s.drawer,
     selectPendingDeleteMethod: (s) => s.pendingDeleteMethod,
     selectMethodCounts: (s) => s.methodCounts,
@@ -200,7 +196,6 @@ const paymentsSlice = createSlice({
 export const {
   setMethodSearch,
   setMethodType,
-  setMethodWebsite,
   setMethodPage,
   setMethodPageSize,
   clearMethodFilters,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import NextImage from "next/image";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -11,8 +11,8 @@ const MAX_BYTES = 512 * 1024;
 /**
  * Picture field for customer-supplied images (logo, section artwork).
  *
- * In this demo the file is read into a data URL and kept with the website's content; a real build
- * would upload it to the storage module and keep the returned key instead.
+ * With `upload`, the file goes to the website's own storage prefix and the returned URL is stored.
+ * Without one — the create wizard, where no website exists yet — it falls back to a data URL.
  */
 export function ImageUpload({
   value,
@@ -21,6 +21,7 @@ export function ImageUpload({
   label = "Upload image",
   hint,
   onError,
+  upload,
   className,
 }: {
   value: string | null;
@@ -29,14 +30,30 @@ export function ImageUpload({
   label?: string;
   hint?: string;
   onError?: (message: string) => void;
+  /** Uploads the file and resolves to its URL. Omit to keep the image inline as a data URL. */
+  upload?: (file: File) => Promise<string>;
   className?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
 
-  const pick = (file: File | undefined) => {
+  const pick = async (file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) return onError?.("Choose an image file.");
     if (file.size > MAX_BYTES) return onError?.("Images must be 512 KB or smaller.");
+
+    if (upload) {
+      setBusy(true);
+      try {
+        onChange(await upload(file));
+      } catch {
+        onError?.("We couldn’t upload that image.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => onChange(typeof reader.result === "string" ? reader.result : null);
     reader.onerror = () => onError?.("We couldn’t read that file.");
@@ -60,15 +77,15 @@ export function ImageUpload({
           accept="image/png,image/jpeg,image/webp,image/svg+xml"
           className="sr-only"
           onChange={(e) => {
-            pick(e.target.files?.[0]);
+            void pick(e.target.files?.[0]);
             e.target.value = "";
           }}
         />
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={() => input.current?.click()}>
-            {value ? "Replace" : label}
+          <Button variant="secondary" size="sm" loading={busy} onClick={() => input.current?.click()}>
+            {busy ? "Uploading…" : value ? "Replace" : label}
           </Button>
-          {value && (
+          {value && !busy && (
             <Button variant="ghost" size="sm" leftIcon={<Trash2 className="size-4" />} onClick={() => onChange(null)}>
               Remove
             </Button>

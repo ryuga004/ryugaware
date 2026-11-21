@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -118,5 +119,54 @@ func TestTenantLicense_Missing_NotFound(t *testing.T) {
 	_, err := svc.TenantLicense(t.Context(), &Principal{UserID: user.ID, TenantID: tenant.ID})
 	if !apperrors.IsCode(err, apperrors.CodeNotFound) {
 		t.Fatalf("err = %v, want %s", err, apperrors.CodeNotFound)
+	}
+}
+
+type fakeCounter struct{ n int64 }
+
+func (f fakeCounter) CountForTenant(ctx context.Context, tenantID uuid.UUID) (int64, error) {
+	return f.n, nil
+}
+
+func TestTenantLicense_UsageComesFromTheWebsiteCount(t *testing.T) {
+	svc, repo, _, _ := newTestService(t)
+	user, tenant := seedUser(t, svc, repo, "owner@acme.test", "correct-horse")
+	seedLicense(repo, tenant.ID, 3, fixedNow.Add(24*time.Hour))
+	svc.WithWebsiteCounter(fakeCounter{n: 2})
+
+	got, err := svc.TenantLicense(t.Context(), &Principal{UserID: user.ID, TenantID: tenant.ID})
+	if err != nil {
+		t.Fatalf("TenantLicense: %v", err)
+	}
+	if got.Used != 2 || got.Remaining != 1 {
+		t.Errorf("used/remaining = %d/%d, want 2/1", got.Used, got.Remaining)
+	}
+	if got.LimitReached {
+		t.Error("limitReached = true with a website still available")
+	}
+}
+
+func TestTenantLicense_LimitReachedWhenCountMeetsAllowance(t *testing.T) {
+	svc, repo, _, _ := newTestService(t)
+	user, tenant := seedUser(t, svc, repo, "owner@acme.test", "correct-horse")
+	seedLicense(repo, tenant.ID, 2, fixedNow.Add(24*time.Hour))
+	svc.WithWebsiteCounter(fakeCounter{n: 2})
+
+	got, err := svc.TenantLicense(t.Context(), &Principal{UserID: user.ID, TenantID: tenant.ID})
+	if err != nil {
+		t.Fatalf("TenantLicense: %v", err)
+	}
+	if !got.LimitReached || got.Remaining != 0 {
+		t.Errorf("limitReached=%v remaining=%d, want true/0", got.LimitReached, got.Remaining)
+	}
+}
+
+func TestWebsiteAllowance_ExpiredLicenceIsForbidden(t *testing.T) {
+	svc, repo, _, _ := newTestService(t)
+	_, tenant := seedUser(t, svc, repo, "owner@acme.test", "correct-horse")
+	seedLicense(repo, tenant.ID, 3, fixedNow.Add(-time.Hour))
+
+	if _, err := svc.WebsiteAllowance(t.Context(), tenant.ID); !apperrors.IsCode(err, apperrors.CodeForbidden) {
+		t.Fatalf("err = %v, want %s", err, apperrors.CodeForbidden)
 	}
 }

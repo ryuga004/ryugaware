@@ -1,6 +1,6 @@
 "use client";
 
-import { Controller, useForm, useWatch, type Control } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert } from "@/components/platform/Alert";
 import { Drawer } from "@/components/platform/Drawer";
@@ -8,13 +8,11 @@ import { ErrorState } from "@/components/platform/ErrorState";
 import { FormField } from "@/components/platform/FormField";
 import { PasswordInput } from "@/components/platform/PasswordInput";
 import { Button } from "@/components/ui/Button";
-import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Select } from "@/components/ui/Select";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Switch } from "@/components/ui/Switch";
-import { useGetWebsiteOptionsQuery } from "@/features/websites/api";
 import { applyFieldErrors } from "@/lib/api/helpers";
 import { cn } from "@/lib/cn";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -75,8 +73,6 @@ function toValues(m?: PaymentMethod, preset?: { type: PaymentType; provider: Pay
     maxOrder: m?.maxOrder != null ? String(m.maxOrder) : "",
     keyId: "",
     keySecret: "",
-    appliesTo: m?.appliesTo ?? "all",
-    websiteIds: m?.websiteIds ?? [],
     enabled: m?.enabled ?? true,
   };
 }
@@ -102,7 +98,7 @@ function MethodForm({ method, preset }: { method?: PaymentMethod; preset?: { typ
     mode: "onTouched",
   });
 
-  const [type, provider, testMode, appliesTo] = useWatch({ control, name: ["type", "provider", "testMode", "appliesTo"] });
+  const [type, provider, testMode] = useWatch({ control, name: ["type", "provider", "testMode"] });
   const cod = type === "cod";
   const providerInfo = PAYMENT_PROVIDER[provider as PaymentProvider] ?? PAYMENT_PROVIDER.razorpay;
   const providerChanged = editing && method!.type !== "cod" && provider !== method!.provider;
@@ -277,31 +273,6 @@ function MethodForm({ method, preset }: { method?: PaymentMethod; preset?: { typ
           </>
         )}
 
-        <FormField label="Available on" error={errors.websiteIds?.message}>
-          {(c) => (
-            <Controller
-              control={control}
-              name="appliesTo"
-              render={({ field }) => (
-                <Select
-                  id={c.id}
-                  invalid={c.invalid}
-                  aria-describedby={c["aria-describedby"]}
-                  value={field.value}
-                  onChange={(e) => {
-                    field.onChange(e.target.value);
-                    clearErrors("websiteIds");
-                  }}
-                  options={[
-                    { value: "all", label: "All websites" },
-                    { value: "selected", label: "Selected websites" },
-                  ]}
-                />
-              )}
-            />
-          )}
-        </FormField>
-        {appliesTo === "selected" && <WebsiteChecklist control={control} />}
 
         <Controller
           control={control}
@@ -320,44 +291,5 @@ function MethodForm({ method, preset }: { method?: PaymentMethod; preset?: { typ
         />
       </form>
     </Drawer>
-  );
-}
-
-function WebsiteChecklist({ control }: { control: Control<PaymentMethodValues, unknown, PaymentMethodOutput> }) {
-  const { data: sites, isLoading } = useGetWebsiteOptionsQuery();
-  return (
-    <Controller
-      control={control}
-      name="websiteIds"
-      render={({ field }) => {
-        const selected = new Set(field.value);
-        const toggle = (id: string, on: boolean) => {
-          const next = new Set(selected);
-          if (on) next.add(id);
-          else next.delete(id);
-          field.onChange([...next]);
-        };
-        return (
-          <fieldset className="-mt-2 rounded-md border border-line p-3">
-            <legend className="sr-only">Websites</legend>
-            {isLoading || !sites ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-4 w-1/3" />
-              </div>
-            ) : (
-              <ul className="grid gap-2.5 sm:grid-cols-2">
-                {sites.map((w) => (
-                  <li key={w.id}>
-                    <Checkbox label={w.name} checked={selected.has(w.id)} onChange={(e) => toggle(w.id, e.target.checked)} onBlur={field.onBlur} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </fieldset>
-        );
-      }}
-    />
   );
 }

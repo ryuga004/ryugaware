@@ -75,3 +75,11 @@ export interface WebsiteOption {
   host: string;
   status: WebsiteStatus;
 }
+
+/** A file uploaded into the website's own storage prefix. */
+export interface Asset {
+  key: string;
+  url: string;
+  size: number;
+  contentType: string;
+}

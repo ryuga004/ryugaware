@@ -2,10 +2,8 @@ import type { Paginated } from "@/lib/api/types";
 
 /* ───────────────────────── Payment methods ───────────────────────── */
 
-export type PaymentType = "card" | "upi" | "netbanking" | "wallet" | "cod";
-export type PaymentProvider = "razorpay" | "payu" | "cashfree" | "phonepe" | "paytm" | "offline";
-/** Where the method is offered: every website, or only the listed ones. */
-export type PaymentScope = "all" | "selected";
+export type PaymentType = "cod" | "upi" | "card";
+export type PaymentProvider = "offline" | "phonepe" | "paytm" | "gpay" | "razorpay";
 
 export interface PaymentMethod {
   id: string;
@@ -22,10 +20,6 @@ export interface PaymentMethod {
   /** Cash on delivery only: order value limits in rupees. */
   minOrder: number | null;
   maxOrder: number | null;
-  appliesTo: PaymentScope;
-  websiteIds: string[];
-  /** Names of `websiteIds`, resolved by the server. */
-  websiteNames: string[];
   /** The API key id with the middle hidden, e.g. rzp_live_••••K2M4. Null for cash on delivery. */
   keyIdMasked: string | null;
   /** The secret is write-only: the server only says whether one is stored. */
@@ -37,7 +31,6 @@ export interface PaymentMethod {
 export interface PaymentMethodFilters {
   search: string;
   type: PaymentType | "all";
-  websiteId: string;
   page: number;
   pageSize: number;
 }
@@ -62,8 +55,6 @@ export interface PaymentMethodInput {
   /** Omit (or leave empty) on PATCH to keep the stored key. */
   keyId?: string;
   keySecret?: string;
-  appliesTo: PaymentScope;
-  websiteIds: string[];
   enabled: boolean;
 }
 

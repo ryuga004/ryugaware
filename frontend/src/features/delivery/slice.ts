@@ -17,7 +17,7 @@ interface DeliveryState {
   shipmentCounts: ShipmentCounts | null;
 }
 
-export const DEFAULT_METHOD_FILTERS: DeliveryMethodFilters = { search: "", websiteId: "all", status: "all", page: 1, pageSize: 10 };
+export const DEFAULT_METHOD_FILTERS: DeliveryMethodFilters = { search: "", status: "all", page: 1, pageSize: 10 };
 export const DEFAULT_SHIPMENT_FILTERS: ShipmentFilters = { search: "", status: "all", methodType: "all", websiteId: "all", page: 1, pageSize: 10 };
 
 const initialState: DeliveryState = {
@@ -38,10 +38,6 @@ const deliverySlice = createSlice({
     /* Methods */
     setMethodSearch(state, a: PayloadAction<string>) {
       state.methodFilters.search = a.payload;
-      state.methodFilters.page = 1;
-    },
-    setMethodWebsite(state, a: PayloadAction<string>) {
-      state.methodFilters.websiteId = a.payload;
       state.methodFilters.page = 1;
     },
     setMethodStatus(state, a: PayloadAction<DeliveryMethodFilters["status"]>) {
@@ -151,7 +147,7 @@ const deliverySlice = createSlice({
     selectMethodDrawer: (s) => s.methodDrawer,
     selectPendingDeleteMethodId: (s) => s.pendingDeleteMethodId,
     selectMethodCounts: (s) => s.methodCounts,
-    selectMethodHasFilters: (s) => s.methodFilters.search !== "" || s.methodFilters.websiteId !== "all" || s.methodFilters.status !== "all",
+    selectMethodHasFilters: (s) => s.methodFilters.search !== "" || s.methodFilters.status !== "all",
     selectShipmentFilters: (s) => s.shipmentFilters,
     selectOpenShipmentId: (s) => s.openShipmentId,
     selectPendingReturnShipmentId: (s) => s.pendingReturnShipmentId,
@@ -163,7 +159,6 @@ const deliverySlice = createSlice({
 
 export const {
   setMethodSearch,
-  setMethodWebsite,
   setMethodStatus,
   setMethodPage,
   setMethodPageSize,

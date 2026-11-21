@@ -19,7 +19,7 @@ export const deliveryMethodSchema = z
   .object({
     type: z.enum(["standard", "express", "same_day", "pickup"]),
     name: z.string().trim().min(1, "Enter a name customers will see.").max(40, "Use 40 characters or fewer."),
-    carrier: z.string().min(1, "Choose a carrier."),
+    partner: z.enum(["shiprocket", "self", "pickup"], { message: "Choose a delivery partner." }),
     minDays: z.string().trim(),
     maxDays: z.string().trim(),
     rateType: z.enum(["flat", "free", "free_above"]),
@@ -28,8 +28,6 @@ export const deliveryMethodSchema = z
     coverage: z.enum(["all_india", "metro", "states", "pincodes"]),
     states: z.array(z.string()),
     pincodes: z.string(),
-    allWebsites: z.boolean(),
-    websiteIds: z.array(z.string()),
     enabled: z.boolean(),
   })
   .superRefine((v, ctx) => {
@@ -56,13 +54,12 @@ export const deliveryMethodSchema = z
       if (pins.length === 0) issue("pincodes", "Add at least one PIN code or prefix.");
       else if (pins.some((p) => !PIN_PREFIX.test(p))) issue("pincodes", "Use 2–6 digit PIN codes or prefixes, separated by commas.");
     }
-    if (!v.allWebsites && v.websiteIds.length === 0) issue("websiteIds", "Choose at least one website.");
   })
   .transform(
     (v): DeliveryMethodInput => ({
       name: v.name,
       type: v.type,
-      carrier: v.carrier,
+      partner: v.partner,
       minDays: Number(v.minDays),
       maxDays: Number(v.maxDays),
       rateType: v.rateType,
@@ -70,7 +67,6 @@ export const deliveryMethodSchema = z
       freeAbove: v.rateType === "free_above" ? Number(v.freeAbove) : null,
       coverage: v.coverage,
       regions: v.coverage === "states" ? v.states : v.coverage === "pincodes" ? parsePinPrefixes(v.pincodes) : [],
-      websiteIds: v.allWebsites ? [] : v.websiteIds,
       enabled: v.enabled,
     }),
   );
@@ -80,5 +76,5 @@ export type DeliveryMethodOutput = z.output<typeof deliveryMethodSchema>;
 
 /** Form field names, for mapping server field errors. */
 export const DELIVERY_METHOD_FIELDS = [
-  "type", "name", "carrier", "minDays", "maxDays", "rateType", "price", "freeAbove", "coverage", "states", "pincodes", "websiteIds",
+  "type", "name", "partner", "minDays", "maxDays", "rateType", "price", "freeAbove", "coverage", "states", "pincodes",
 ] as const;

@@ -13,13 +13,12 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Select } from "@/components/ui/Select";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Switch } from "@/components/ui/Switch";
-import { useGetWebsiteOptionsQuery } from "@/features/websites/api";
 import { applyFieldErrors } from "@/lib/api/helpers";
 import { cn } from "@/lib/cn";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useAddDeliveryMethodMutation, useGetDeliveryMethodQuery, useUpdateDeliveryMethodMutation } from "../api";
 import {
-  CARRIER_OPTIONS,
+  PARTNER_OPTIONS,
   COVERAGE_OPTIONS,
   DELIVERY_TYPE_DEFAULTS,
   DELIVERY_TYPE_OPTIONS,
@@ -64,7 +63,7 @@ function toValues(m?: DeliveryMethod): DeliveryMethodValues {
     return {
       type: "standard",
       name: d.name,
-      carrier: d.carrier,
+      partner: d.partner,
       minDays: String(d.minDays),
       maxDays: String(d.maxDays),
       rateType: d.rateType,
@@ -73,15 +72,13 @@ function toValues(m?: DeliveryMethod): DeliveryMethodValues {
       coverage: d.coverage,
       states: [],
       pincodes: "",
-      allWebsites: true,
-      websiteIds: [],
       enabled: true,
     };
   }
   return {
     type: m.type,
     name: m.name,
-    carrier: m.carrier,
+    partner: m.partner,
     minDays: String(m.minDays),
     maxDays: String(m.maxDays),
     rateType: m.rateType,
@@ -90,13 +87,11 @@ function toValues(m?: DeliveryMethod): DeliveryMethodValues {
     coverage: m.coverage,
     states: m.coverage === "states" ? m.regions : [],
     pincodes: m.coverage === "pincodes" ? m.regions.join(", ") : "",
-    allWebsites: m.websiteIds.length === 0,
-    websiteIds: m.websiteIds,
     enabled: m.enabled,
   };
 }
 
-const DEFAULTED = ["name", "carrier", "minDays", "maxDays", "rateType", "price", "coverage"] as const;
+const DEFAULTED = ["name", "partner", "minDays", "maxDays", "rateType", "price", "coverage"] as const;
 
 function MethodForm({ method }: { method?: DeliveryMethod }) {
   const dispatch = useAppDispatch();
@@ -118,7 +113,7 @@ function MethodForm({ method }: { method?: DeliveryMethod }) {
     defaultValues: toValues(method),
     mode: "onTouched",
   });
-  const [rateType, coverage, allWebsites] = useWatch({ control, name: ["rateType", "coverage", "allWebsites"] });
+  const [rateType, coverage] = useWatch({ control, name: ["rateType", "coverage"] });
 
   /** New methods: picking a type fills in that type's usual carrier, time and fee unless the merchant already edited them. */
   const onTypeChange = (type: DeliveryType, setType: (t: DeliveryType) => void) => {
@@ -187,8 +182,8 @@ function MethodForm({ method }: { method?: DeliveryMethod }) {
           <FormField label="Display name" required error={errors.name?.message} hint="Shown to customers at checkout.">
             {(c) => <Input {...c} {...register("name")} maxLength={40} autoComplete="off" />}
           </FormField>
-          <FormField label="Carrier" required error={errors.carrier?.message}>
-            {(c) => <Select id={c.id} invalid={c.invalid} aria-describedby={c["aria-describedby"]} options={CARRIER_OPTIONS} {...register("carrier")} />}
+          <FormField label="Delivery partner" required error={errors.partner?.message}>
+            {(c) => <Select id={c.id} invalid={c.invalid} aria-describedby={c["aria-describedby"]} options={PARTNER_OPTIONS} {...register("partner")} />}
           </FormField>
         </div>
 
@@ -250,27 +245,6 @@ function MethodForm({ method }: { method?: DeliveryMethod }) {
           )}
         </fieldset>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-sm font-medium text-ink">Available on</legend>
-          <Controller
-            control={control}
-            name="allWebsites"
-            render={({ field }) => (
-              <SegmentedControl
-                ariaLabel="Websites"
-                value={field.value ? "all" : "some"}
-                onChange={(v) => field.onChange(v === "all")}
-                options={[
-                  { value: "all", label: "All websites" },
-                  { value: "some", label: "Selected websites" },
-                ]}
-                className="w-full [&>button]:flex-1"
-              />
-            )}
-          />
-          {!allWebsites && <WebsitesPicker control={control} error={errors.websiteIds?.message} />}
-        </fieldset>
-
         <Controller
           control={control}
           name="enabled"
@@ -322,29 +296,3 @@ function StatesPicker({ control, error }: { control: Control<DeliveryMethodValue
   );
 }
 
-function WebsitesPicker({ control, error }: { control: Control<DeliveryMethodValues, unknown, DeliveryMethodOutput>; error?: string }) {
-  const { data: sites, isLoading } = useGetWebsiteOptionsQuery();
-  return (
-    <Controller
-      control={control}
-      name="websiteIds"
-      render={({ field }) => (
-        <div role="group" aria-label="Websites">
-          <div className="flex flex-col gap-2 rounded-md border border-line p-3">
-            {isLoading || !sites
-              ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-4 w-1/2" />)
-              : sites.map((w) => (
-                  <Checkbox
-                    key={w.id}
-                    label={w.name}
-                    checked={field.value.includes(w.id)}
-                    onChange={(e) => field.onChange(e.target.checked ? [...field.value, w.id] : field.value.filter((x) => x !== w.id))}
-                  />
-                ))}
-          </div>
-          {error && <p className="mt-1.5 text-xs text-danger-hover">{error}</p>}
-        </div>
-      )}
-    />
-  );
-}

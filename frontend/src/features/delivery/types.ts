@@ -3,6 +3,8 @@ import type { Paginated } from "@/lib/api/types";
 /* ───────────── Delivery methods ───────────── */
 
 export type DeliveryType = "standard" | "express" | "same_day" | "pickup";
+/** The integration that actually moves the parcel. */
+export type DeliveryPartner = "shiprocket" | "self" | "pickup";
 /** flat: always `price`; free: never charged; free_above: `price` unless the order is at least `freeAbove`. */
 export type RateType = "flat" | "free" | "free_above";
 /** Where a method is offered. `states` and `pincodes` use `regions`. */
@@ -12,7 +14,9 @@ export interface DeliveryMethod {
   id: string;
   name: string;
   type: DeliveryType;
-  carrier: string;
+  partner: DeliveryPartner;
+  /** Display name for `partner`, resolved by the server. */
+  partnerLabel: string;
   /** Delivery time in days. 0–0 means same day (or ready the same day for pickup). */
   minDays: number;
   maxDays: number;
@@ -23,10 +27,6 @@ export interface DeliveryMethod {
   coverage: CoverageType;
   /** State names (coverage "states") or PIN code prefixes (coverage "pincodes"). */
   regions: string[];
-  /** Websites this method is offered on. Empty = all websites. */
-  websiteIds: string[];
-  /** Resolved by the server for display. */
-  websiteNames: string[];
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -34,7 +34,6 @@ export interface DeliveryMethod {
 
 export interface DeliveryMethodFilters {
   search: string;
-  websiteId: string;
   status: "all" | "enabled" | "disabled";
   page: number;
   pageSize: number;
@@ -51,7 +50,7 @@ export type DeliveryMethodsResponse = Paginated<DeliveryMethod, { counts: Delive
 export interface DeliveryMethodInput {
   name: string;
   type: DeliveryType;
-  carrier: string;
+  partner: DeliveryPartner;
   minDays: number;
   maxDays: number;
   rateType: RateType;
@@ -59,7 +58,6 @@ export interface DeliveryMethodInput {
   freeAbove: number | null;
   coverage: CoverageType;
   regions: string[];
-  websiteIds: string[];
   enabled: boolean;
 }
 

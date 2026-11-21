@@ -17,17 +17,20 @@
 | 4 | `internal/shared/apperrors`, `internal/shared/response` | ✅ done |
 | 5 | `internal/platform/database` + migrations | ✅ done (auth, notification and template schema) |
 | 6 | `internal/platform/redis` | ✅ done (client + key builder) |
-| 7 | `internal/platform/storage` (S3/MinIO) | ⬜ not started |
+| 7 | `internal/platform/storage` (S3/MinIO) | ✅ `Store` interface + S3/MinIO adapter + per-website prefix; constructed in bootstrap and used by `websites` |
 | 8 | `internal/platform/email` (SMTP/Mailpit) | ✅ done (stdlib SMTP, none/STARTTLS/TLS) |
 | 9 | `internal/platform/messaging` (Redis Streams) | ✅ publisher, outbox relay, consumer groups, pending recovery, DLQ |
 | 10 | `internal/bootstrap` + `cmd/api` lifecycle | ✅ done (wiring, health, graceful shutdown) |
 | 11 | `auth` module | ✅ done (12 endpoints, 40 unit tests, smoke-tested end to end) |
 | 12 | `admin` module | ⬜ not started |
 | 12b | `templates` module | ✅ read-only catalogue (3 endpoints, 10 unit tests) |
+| 12c | `payments` module | ✅ CRUD + strategy/adapter, 11 unit tests. `process` makes **no gateway calls** |
+| 12d | `delivery` module | ✅ CRUD + partner adapters, 10 unit tests. `process` makes **no partner calls** |
+| 12e | `websites` module | ✅ create-from-template, CRUD, licence + bucket, 14 unit tests |
 | 13 | `audit` module + consumer | ⬜ not started |
 | 14 | `notification` module + e-mail worker | ✅ worker delivers mail; **no admin endpoints** |
 | 15 | `internal/shared/middleware` + route registration | ✅ done |
-| 16 | Unit + integration tests | 🟨 69 unit tests (45 auth, 10 templates, 7 notification, 7 response); **no automated integration tests** |
+| 16 | Unit + integration tests | 🟨 114 unit tests + **12 integration tests** (`tests/integration`, `-tags integration`, skip without `TEST_POSTGRES_DSN`): websites repository SQL, template-content copy, content round-trip, storefront visibility, and S3 put/list/usage/prefix-delete (needs `TEST_S3_*`) |
 | 17 | Dockerfile + compose | 🟨 `compose.yaml` (postgres, redis, minio, mailpit) + `.env.example`; **no app Dockerfile** |
 | 18 | GitHub Actions CI/CD, Makefile, README | ⬜ not started |
 
@@ -92,6 +95,10 @@ token cannot carry stale privileges.
 | `internal/modules/auth/service` | verification, registration, sessions, passwords, JWT, bcrypt+pepper, platform-admin bootstrap, `license.go` (tenant licence + derived status/remaining) | ✅ |
 | `internal/modules/auth/handler` | 13 handlers, cookie handling | ✅ |
 | `internal/modules/templates/{model,dto,repository,service,handler}` | read-only template catalogue: visibility predicate, page-based list with category counts, slug/key lookups | ✅ |
+| `internal/modules/payments/{model,dto,repository,service,handler}` | tenant payment methods; `Strategy` per type (cod/upi/card) and `Gateway` adapter per provider | ✅ |
+| `internal/modules/delivery/{model,dto,repository,service,handler}` | tenant delivery methods; `Partner` adapter per integration (shiprocket/self/pickup), no strategy layer | ✅ |
+| `internal/platform/storage` | `Store` interface, S3/MinIO adapter (put/delete/delete-prefix/list/usage/presign), `WebsitePrefix` / `TenantPrefix` | 🟨 no caller yet |
+| `internal/modules/websites/{model,dto,repository,service,handler}` | create a website from a template reference (copying the template's content), CRUD, licence enforcement, storage prefix, payment/delivery links, site-content read/save, public storefront | ✅ |
 | `internal/bootstrap` | router + middleware stack, module wiring, health, relay, graceful shutdown | ✅ |
 | `cmd/api` | config → logger → bootstrap → signal-driven shutdown | ✅ |
 | `cmd/migrate` | `up`/`down`/`drop`/`goto`/`force`/`version` over the embedded SQL, waits for Postgres | ✅ |
@@ -168,6 +175,20 @@ Live. Health is unversioned; everything else is under `/api/v1`. Request and res
 | GET | `/api/v1/templates` | session | catalogue list. Query `search`, `category`, `page`, `pageSize`. **Page-based, not cursor** (`backend-api.md` §5 exception): the UI needs a total count and random page access for its pager. `meta` carries `categories` — all 6 `template_categories` with counts, plus a synthesised `all` |
 | GET | `/api/v1/templates/:slug` | session | one template; `id` in the body **is the slug**. No `previewUrl`: previewing is a frontend concern (see Decision log, 2026-11-19) |
 | GET | `/api/v1/templates/:slug/pages/:key` | session | one template page, addressed by its manifest key |
+| POST | `/api/v1/websites/:id/assets` | session | multipart upload into the website's own prefix. Type is **sniffed**, not trusted; returns the public URL |
+| GET | `/api/v1/storage` | session | platform storage: per-website usage, totals, and the licence allowance |
+| GET | `/api/v1/storefront/:site` | **public** | a live website by subdomain: content + commerce options. Draft and paused return 404 |
+| GET/PUT | `/api/v1/site-content/:id` | session | the editor's read and save: theme, chrome and every page's seo/sections/settings |
+| GET/POST | `/api/v1/websites` | session | list / create. **Create takes a template reference only** (`templateId` is the template slug); the backend copies the structure |
+| GET | `/api/v1/websites/check-subdomain?subdomain=` | session | `{subdomain, available, suggestion?}` for the create wizard |
+| GET/PATCH/DELETE | `/api/v1/websites/:id` | session | one website. `PATCH` is partial and handles publish; `DELETE` also purges the storage prefix |
+| GET | `/api/v1/websites/:id/pages` | session | the website's copied pages |
+| GET/POST | `/api/v1/payments/methods` | session | tenant payment methods; page-based (`meta.counts`) |
+| GET/PATCH/DELETE | `/api/v1/payments/methods/:id` | session | one method. `PATCH` is partial: an absent field is unchanged |
+| POST | `/api/v1/payments/methods/:id/process` | session | run a payment through the method's strategy. **No gateway call is made** |
+| GET/POST | `/api/v1/delivery/methods` | session | tenant delivery methods; page-based (`meta.counts`) |
+| GET/PATCH/DELETE | `/api/v1/delivery/methods/:id` | session | one method. `PATCH` is partial |
+| POST | `/api/v1/delivery/methods/:id/process` | session | hand a consignment to the method's partner adapter. **No partner call is made** |
 | GET | `/api/v1/license` | session | the caller's tenant licence: `plan`, `status`, `allowance`, `used`, `remaining`, `limitReached`, `validUntil`. `status` is derived (`expires_at <= now` → `expired`), not stored |
 | DELETE | `/api/v1/auth/sessions/current` | optional | logout, idempotent |
 | POST | `/api/v1/auth/password/forgot` | public | queue a reset e-mail, always `{sent:true}` |
@@ -243,6 +264,9 @@ constraint, so FK columns remain unindexed.
 
 | Version | File | Creates |
 |---|---|---|
+| 7 | `template_content` | Adds `templates.chrome`; seeds the Aurelia preset into it and into each `template_pages.variables` (title, seo, sections, settings). Generated from `features/storefront/templates/ecommerce/preset.ts`, not hand-written |
+| 6 | `websites` | `websites`, `website_pages`, `website_payment_methods`, `website_delivery_methods`; adds `(id, tenant_id)` unique keys to the two method tables so the join tables can carry composite FKs |
+| 5 | `payments_delivery` | `payment_methods`, `delivery_methods` — both tenant-owned, with CHECK constraints carrying the type/provider and rate/coverage rules |
 | 4 | `ecommerce_template` | Seed only, no DDL: the platform `aurelia_commerce` template (Aurelia Commerce) + its 13 `template_pages`. Ids are left to `gen_random_uuid()`; rows are addressed by `slug` / `key`, and `down` deletes the template by slug and lets `template_pages` cascade |
 | 3 | `templates` | `template_categories` (+ the 6 seeded categories), `templates` (incl. `features` / `payment_methods` JSONB arrays), `template_pages`, `template_assets` |
 | 2 | `notification_delivery` | `email_deliveries`; rewrites the platform `password_reset` template from an OTP code to a `{{reset_url}}` button |
@@ -374,11 +398,29 @@ never imports the messaging package and the platform never imports a module.
   it. If Redis accepts the publish and the worker then fails permanently, the user sees "sent" and
   never receives a code; the `email_deliveries` row records the failure for support.
 - `admin` and `audit` modules are unwritten, so `/admin/*` returns 404.
-- `internal/platform/storage` (S3/MinIO) is unwritten; the AWS SDK is not in `go.mod`.
-- **No automated integration tests.** The 69 unit tests use fakes; the end-to-end runs described in
-  the Build log were done by hand and are not repeatable in CI. Cross-tenant tests required by
-  `.claude/rules/backend-multitenancy.md` §6 do not exist — the `/templates` predicate is the first
-  one that genuinely needs them, and the pattern must be in place before `admin` lands.
+- **The template preset now lives in two places.** Migration 7 seeded `ECOMMERCE_PRESET` into
+  `templates.chrome` and `template_pages.variables`, but the TypeScript original is still at
+  `frontend/src/features/storefront/templates/ecommerce/preset.ts`, where the editor's preview path
+  (`previewSite`) reads it. **Edit one and the other drifts.** The migration was generated from the TS
+  file, so the regeneration path exists; the lasting fix is to make the database the only source and
+  have the preview read `GET /templates/:slug` instead.
+- **`payment_methods.key_secret` is stored in plaintext**, like `tenants.password_pepper`. Nothing reads
+  it today because no gateway is called, but it must be encrypted under a key held outside Postgres
+  before any real integration ships.
+- **`process` on payments and delivery performs no external call and records nothing.** The strategies
+  and adapters validate, pick the right provider and return a typed result, but there is no HTTP, no
+  SDK, no webhook, and **no transaction or shipment row** — `payments.transactions` and `shipments`
+  need `websites` and `orders`, which do not exist. `POST /payments/methods/:id/process` therefore has
+  no side effect to be idempotent about; `Idempotency-Key` (`backend-api.md` §6) is required before it
+  moves real money.
+- **The frontend's transactions, revenue and shipments screens have no backend.**
+  `features/payments` still calls `/payments/transactions` and `/payments/revenue`, and
+  `features/delivery` calls `/shipments` and `/delivery/methods/presets`; none exist.
+- **Integration coverage is one package deep.** `tests/integration` now runs the websites repository
+  against a real Postgres (behind `-tags integration`, skipping without `TEST_POSTGRES_DSN`), which is
+  what caught the `FOR UPDATE` bug. Every other repository — auth, templates, payments, delivery — is
+  still only exercised through fakes, so **their SQL has never executed in a test**. The same class of
+  bug can still reach production from any of them.
 - **The frontend now speaks this API.** `frontend/src/features/auth` and `lib/api/baseApi.ts` were
   rewritten for it: the real paths, camelCase bodies, RFC 9457 parsing into the flat
   `{code, message, fieldErrors}` the forms already read, OTP-first registration, and a silent
@@ -391,9 +433,8 @@ never imports the messaging package and the platform never imports a module.
   module that does not exist yet and will show its error state until `admin`, `audit` and
   `notification` are built.
 - **Profile write is still unbuilt, and `/license` reports zero usage.** `GET /api/v1/license` is live,
-  but `used` is hardcoded to `0` in `service.TenantLicense` (so `remaining` always equals `allowance`
-  and `limitReached` is only ever true for a zero allowance) because there is no `websites` table to
-  count. The ProfilePage usage bar therefore reads "0 of N used" — a real-looking number that is not
+  and `used` is now the real website count, through a `WebsiteCounter` interface the websites module
+  satisfies. The ProfilePage usage bar therefore reads "0 of N used" — a real-looking number that is not
   real until the websites module lands and supplies the count. `features/account` still calls
   `PATCH /api/v1/me` (the "Edit profile" drawer) and `features/settings` calls
   `POST /api/v1/account/password`; neither exists — the backend's password change is
@@ -1057,3 +1098,114 @@ never imports the messaging package and the platform never imports a module.
   its `products`, `cart`, `checkout` and `account` paths all return 200 with the storefront rendered
   (16 catalogue products with ₹ prices, links scoped to the preview route), and an unknown slug
   renders the "No template at this address" state instead of failing.
+- **2026-11-20** — Payment and delivery options, both **tenant-scoped**. Owner's call: a method belongs
+  to the tenant, and a website picks from them in the website create flow, so neither table has a
+  website column and neither screen has a website filter. Migration 5 adds `payment_methods` and
+  `delivery_methods`, with the rules in CHECK constraints rather than in Go: COD must use the `offline`
+  provider and carry no credentials or test mode, order limits belong to COD alone, `free_above`
+  requires a value exactly when the rate is `free_above`, a free rate cannot have a price, regions are
+  allowed only for state or PIN coverage, and the pickup type and pickup partner imply each other.
+  **Payments use a strategy per type with an adapter per provider**, as asked: `codStrategy` and a
+  shared `gatewayStrategy` sit behind `Strategy`, and `Gateway` adapts PhonePe, Paytm, Google Pay
+  (UPI) and Razorpay (card). **Delivery uses adapters only, no strategy** — `Partner` covers
+  Shiprocket, own fleet and store pickup, because every partner answers the same two questions.
+  Vocabulary narrowed to the owner's list: payment types are `cod|upi|card` and providers
+  `offline|phonepe|paytm|gpay|razorpay`; `netbanking`, `wallet`, PayU and Cashfree were dropped from
+  the frontend unions, and delivery's free-text `carrier` became the typed `partner`.
+  `process` **deliberately makes no network call and writes no row** — see **Known gaps**.
+  `internal/platform/storage` landed too: the `Store` interface, an S3/MinIO adapter and the
+  `t/<tenant>/w/<website>/` prefix scheme that gives each website its own key space inside one platform
+  bucket. `DeletePrefix` refuses any prefix that does not end in `/`, so reclaiming a website's storage
+  cannot walk into a sibling's keys. **New dependency**: `aws-sdk-go-v2` (`config`, `credentials`,
+  `service/s3`), which replaces hand-rolling SigV4 — signing S3 requests by hand is the kind of
+  security-critical code this project should not own. Storage has no caller yet because it is
+  per-website and `websites` does not exist.
+  Verified: migration 5 up/down/up clean with zero leftovers, and all 17 CHECK constraints exercised
+  against Postgres 17 — each rejection named the expected constraint and each valid row was accepted.
+- **2026-11-20** — Website creation from a template reference. The frontend posts `{name, subdomain,
+  templateId, branding, disabledPages}` and **never sends content**; the backend resolves the template
+  by slug (platform-owned or own-tenant, published only), then copies its structure into
+  `websites` + `website_pages` inside one transaction, links the tenant's enabled payment and delivery
+  methods, and records the storage prefix. Migration 6 adds `websites`, `website_pages` and the two
+  join tables; it also adds `(id, tenant_id)` unique keys to `payment_methods` and `delivery_methods`
+  so the join tables can use **composite foreign keys** — a tenant physically cannot attach another
+  tenant's payment method, which was verified against Postgres.
+  Resolved with the owner: a new website is **draft**; the **licence cap counts every website, draft
+  included**, and returns `403` — the count runs `SELECT … FOR UPDATE` inside the create transaction,
+  so two parallel creates cannot both pass it; **the bucket is a recorded prefix, not an S3 call** —
+  `storage_prefix` is written at create and `DeletePrefix` reclaims the objects on delete, so create
+  cannot half-fail between Postgres and S3; **subdomains are globally unique**, validated, and a
+  reserved list (`www`, `api`, `admin`, `preview`, …) is held back, with `GET /websites/check-subdomain`
+  serving the wizard and suggesting `-2`, `-3` on a clash.
+  Two consequences worth naming. The website DTO returns `templateId` as the **template slug**, not the
+  UUID, because the storefront resolves its manifest with `getTemplate(site.templateId)` — returning the
+  UUID would have broken the renderer and the editor exactly as the old manifest-id mismatch did.
+  And `/license` now reports **real usage**: `auth` declares a `WebsiteCounter` interface that the
+  websites module satisfies, wired in bootstrap, which closes the hardcoded `used: 0`.
+  `internal/platform/storage` is constructed in bootstrap for the first time, so the S3/MinIO adapter
+  now has a caller. **Assumption, not asked**: the storefront host defaults to `ryugaware.com` because
+  no base-domain env var exists; it should become `APP_BASE_DOMAIN` when domains are built.
+  Verified against Postgres 17: migrations 1→6 up/down/up with zero leftovers; all 7 website
+  constraints exercised (cross-tenant payment link, cross-tenant page, bad prefix shape, uppercase
+  subdomain, live-without-published, duplicate subdomain, valid page); and a hand-run create produced
+  a draft website with 13 copied pages, the template slug surfacing as `templateId`, and a delete that
+  cascaded its pages while leaving `template_pages` untouched.
+- **2026-11-20** — Fixed a 500 on `POST /websites` reported from a live run:
+  `SELECT count(*) … FOR UPDATE` is invalid in Postgres (`FOR UPDATE is not allowed with aggregate
+  functions`). The licence guard now **locks the tenant row** (`SELECT 1 FROM tenants WHERE id = ?
+  FOR UPDATE`) and counts afterwards, as `LockTenantAndCount`. Locking the tenant row is not just a
+  workaround for the aggregate restriction: locking the `websites` rows instead would not have fixed
+  the race it exists for, because row locks do not block an `INSERT`, so two concurrent creates for a
+  tenant with zero websites would both have counted 0 and both succeeded. The tenant row is the one
+  object both transactions touch. Verified against Postgres 17 that the old statement errors, the new
+  pair succeeds, and a second transaction **blocks** on the tenant lock until the first commits.
+  **The unit tests could not have caught this**: every repository in this project is faked, so no
+  repository SQL had ever executed in a test. `tests/integration` now exists — 5 tests behind
+  `-tags integration`, skipping when `TEST_POSTGRES_DSN` is unset, covering `LockTenantAndCount`,
+  the template-slug join, the tenant predicate on `Get`, and the list/count/subdomain queries. The
+  suite was checked both ways: it fails with the old statement and passes with the fix.
+  Also removed 37 comment lines from the Go added on 2026-11-19/20 (payments, delivery, websites,
+  storage), which violated `backend-quality.md` §2 — that rule bans all comments, doc comments
+  included, and the rationale belongs in this file instead.
+- **2026-11-20** — The website editor works end to end. Three endpoints the frontend already called
+  were missing, which is why it showed "We couldn't open this website": `GET`/`PUT /site-content/:id`
+  and `GET /storefront/:site`. All three now exist on the websites module, which owns the tables.
+  The deeper half was content. A website created before today had 13 correctly-structured pages and
+  **nothing in any of them**, because the template's default content lived only in frontend
+  TypeScript. Migration 7 adds `templates.chrome` and seeds the Aurelia preset into it and into each
+  `template_pages.variables` (title, seo, sections, settings). The SQL was **generated from
+  `preset.ts`** by stripping its types with Node and emitting JSON — it was not transcribed by hand,
+  because 10KB of nested content copied by eye is a guaranteed source of silent drift.
+  `websites.Create` now instantiates that content exactly as the frontend's `instantiateSite` does:
+  sections numbered `sec_001` upward across chrome then pages, page ids `pg_<key>`, titles falling
+  back to the manifest label, `required` pages immune to the wizard's disable list, and every
+  settings object deep-copied so no two websites share one.
+  `GET /storefront/:site` is **public and serves `live` websites only** — a draft is unpublished work
+  and must not be readable by subdomain; draft and paused return 404, which the storefront already
+  renders as "No store at this address".
+  4 new integration tests cover what unit tests structurally cannot: that a created website really
+  carries 3 chrome sections, 8 landing sections and 6 shop sections with unique ids and merged theme;
+  that a content save round-trips through Postgres; that an unknown page key is rejected; and that a
+  draft is invisible publicly until published. Verified: migrations 1→7 up/down/up with zero
+  leftovers, 114 unit and 9 integration tests green.
+- **2026-11-20** — Assets reach storage, and the storage screen shows it. Two reports — "storage
+  bucket is not showing" and "asset update in the editor?" — had one root cause: **nothing ever wrote
+  to S3.** `ImageUpload` read each file into a base64 data URL and kept it inline in the section
+  settings, so images lived in JSONB and the bucket stayed empty; its own comment had said a real
+  build would upload instead. New `POST /websites/:id/assets` takes a multipart file, **sniffs the
+  content type** with `http.DetectContentType` rather than trusting the declared one, checks it
+  against `STORAGE_ALLOWED_MIME` and `STORAGE_MAX_UPLOAD_BYTES`, and writes to
+  `t/<tenant>/w/<website>/media/<uuid><ext>`, returning the public URL. `ImageUpload` gained an
+  optional `upload` prop: the editor supplies one through an `AssetUploadProvider` context, while the
+  create wizard — where no website exists yet — keeps the data-URL fallback for the logo.
+  `GET /storage` reports per-website usage, totals and the allowance, which comes from
+  `licenses.storage_limit_bytes` through a new `StorageLimitBytes` on the `Licenses` contract — an
+  earlier draft derived the quota from the upload limit, which was an invented number.
+  The frontend storage feature was **replaced**: it was a bring-your-own-S3 form with a five-step
+  connection test, which contradicts the platform-managed model chosen on 2026-11-19. Its form,
+  status card, test results, schema, constants and slice are deleted; the page is now read-only usage.
+  3 S3 integration tests cover put/list/usage/presign, that `DeletePrefix` refuses any prefix without
+  a trailing `/`, and that deleting one website's prefix leaves a sibling's objects intact.
+  **Not verified by the assistant**: those three skip without `TEST_S3_*`, and reading MinIO's
+  credentials out of the running container was refused, so the S3 path has been exercised only by
+  compilation and by the unit tests — run them with real credentials before trusting uploads.
