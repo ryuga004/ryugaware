@@ -121,3 +121,82 @@ type Storage struct {
 	Objects    int64            `json:"objects"`
 	QuotaBytes int64            `json:"quotaBytes"`
 }
+
+type WebsitePaymentOption struct {
+	ID              string   `json:"id"`
+	Type            string   `json:"type"`
+	Provider        string   `json:"provider"`
+	DisplayName     string   `json:"displayName"`
+	EnabledGlobally bool     `json:"enabledGlobally"`
+	TestMode        bool     `json:"testMode"`
+	FeePercent      float64  `json:"feePercent"`
+	FeeFixed        float64  `json:"feeFixed"`
+	MinOrder        *float64 `json:"minOrder"`
+	MaxOrder        *float64 `json:"maxOrder"`
+	Selected        bool     `json:"selected"`
+}
+
+type WebsiteDeliveryOption struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Type            string   `json:"type"`
+	Carrier         string   `json:"carrier"`
+	MinDays         int      `json:"minDays"`
+	MaxDays         int      `json:"maxDays"`
+	RateType        string   `json:"rateType"`
+	Price           float64  `json:"price"`
+	FreeAbove       *float64 `json:"freeAbove"`
+	Coverage        string   `json:"coverage"`
+	EnabledGlobally bool     `json:"enabledGlobally"`
+	Selected        bool     `json:"selected"`
+}
+
+type StoreSettings struct {
+	WebsiteID string                  `json:"websiteId"`
+	Payments  []WebsitePaymentOption  `json:"payments"`
+	Delivery  []WebsiteDeliveryOption `json:"delivery"`
+}
+
+type MethodSelection struct {
+	ID       string `json:"id" binding:"required,uuid"`
+	Selected bool   `json:"selected"`
+}
+
+type StoreSettingsPatch struct {
+	Payment  *MethodSelection `json:"payment"`
+	Delivery *MethodSelection `json:"delivery"`
+}
+
+type AssetFolder struct {
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Bytes   int64  `json:"bytes"`
+	Objects int64  `json:"objects"`
+}
+
+type AssetFile struct {
+	Key         string    `json:"key"`
+	Name        string    `json:"name"`
+	URL         string    `json:"url"`
+	Size        int64     `json:"size"`
+	ContentType string    `json:"contentType"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type AssetListing struct {
+	WebsiteID string        `json:"websiteId"`
+	Path      string        `json:"path"`
+	Folders   []AssetFolder `json:"folders"`
+	Files     []AssetFile   `json:"files"`
+	Bytes     int64         `json:"bytes"`
+	Objects   int64         `json:"objects"`
+	Truncated bool          `json:"truncated"`
+}
+
+type AssetListQuery struct {
+	Path string `form:"path" binding:"max=300"`
+}
+
+type AssetDeleteQuery struct {
+	Key string `form:"key" binding:"required,max=400"`
+}

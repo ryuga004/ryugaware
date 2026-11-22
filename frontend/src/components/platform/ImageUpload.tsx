@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import NextImage from "next/image";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { ImagePlus, Images, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 
@@ -13,6 +13,9 @@ const MAX_BYTES = 512 * 1024;
  *
  * With `upload`, the file goes to the website's own storage prefix and the returned URL is stored.
  * Without one — the create wizard, where no website exists yet — it falls back to a data URL.
+ *
+ * `onBrowse` adds a second way in: pick a picture the website has already uploaded, so the same hero
+ * image can be reused across sections instead of being uploaded again.
  */
 export function ImageUpload({
   value,
@@ -22,6 +25,7 @@ export function ImageUpload({
   hint,
   onError,
   upload,
+  onBrowse,
   className,
 }: {
   value: string | null;
@@ -32,6 +36,8 @@ export function ImageUpload({
   onError?: (message: string) => void;
   /** Uploads the file and resolves to its URL. Omit to keep the image inline as a data URL. */
   upload?: (file: File) => Promise<string>;
+  /** Opens a picker of pictures this website already has. Omit where there is nothing to browse. */
+  onBrowse?: () => void;
   className?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -85,6 +91,11 @@ export function ImageUpload({
           <Button variant="secondary" size="sm" loading={busy} onClick={() => input.current?.click()}>
             {busy ? "Uploading…" : value ? "Replace" : label}
           </Button>
+          {onBrowse && !busy && (
+            <Button variant="ghost" size="sm" leftIcon={<Images className="size-4" />} onClick={onBrowse}>
+              Choose existing
+            </Button>
+          )}
           {value && !busy && (
             <Button variant="ghost" size="sm" leftIcon={<Trash2 className="size-4" />} onClick={() => onChange(null)}>
               Remove
@@ -98,10 +109,11 @@ export function ImageUpload({
 }
 
 function Preview({ src }: { src: string }) {
-  // Customer uploads arrive as data URLs, which the image optimiser does not accept.
-  if (src.startsWith("data:")) {
+  // The optimiser is configured for /images/** only (next.config.ts), so a customer upload — a data
+  // URL in the create wizard, an S3 URL once the website exists — has to be rendered directly.
+  if (!src.startsWith("/images/")) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" className="size-full object-contain p-2" />;
+    return <img src={src} alt="" className={cn("size-full", src.startsWith("data:") ? "object-contain p-2" : "object-cover")} />;
   }
   return <NextImage src={src} alt="" width={80} height={80} className="size-full object-cover" />;
 }

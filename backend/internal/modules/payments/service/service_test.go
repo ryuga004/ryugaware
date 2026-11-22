@@ -287,13 +287,84 @@ func TestList_PageSizeIsClamped(t *testing.T) {
 	}
 }
 
-func (f *fakeRepo) EnabledIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error) {
+func (f *fakeRepo) ByTypeProvider(ctx context.Context, tenantID uuid.UUID, kind, provider string) (*model.Method, error) {
 	f.lastTenant = tenantID
-	ids := make([]uuid.UUID, 0, len(f.methods))
 	for i := range f.methods {
-		if f.methods[i].TenantID == tenantID && f.methods[i].Enabled {
-			ids = append(ids, f.methods[i].ID)
+		m := &f.methods[i]
+		if m.TenantID == tenantID && m.Type == kind && m.Provider == provider {
+			return m, nil
 		}
 	}
-	return ids, nil
+	return nil, nil
+}
+
+func TestEnsureDefaultMethod_CreatesAnEnabledCODMethodWhenTheTenantHasNone(t *testing.T) {
+	repo := &fakeRepo{}
+	tenant := uuid.New()
+
+	id, err := New(repo).EnsureDefaultMethod(t.Context(), tenant)
+	if err != nil {
+		t.Fatalf("EnsureDefaultMethod: %v", err)
+	}
+	if repo.created == nil {
+		t.Fatal("no method was created")
+	}
+	if repo.created.ID != id {
+		t.Errorf("returned id = %s, want the created method %s", id, repo.created.ID)
+	}
+	if repo.created.TenantID != tenant {
+		t.Errorf("tenant = %s, want %s", repo.created.TenantID, tenant)
+	}
+	if repo.created.Type != model.TypeCOD || repo.created.Provider != model.ProviderOffline {
+		t.Errorf("created %s/%s, want %s/%s", repo.created.Type, repo.created.Provider, model.TypeCOD, model.ProviderOffline)
+	}
+	if !repo.created.Enabled {
+		t.Error("the default method was created switched off")
+	}
+	if repo.created.FeeFixed != 0 || repo.created.FeePercent != 0 {
+		t.Error("the default method charges a fee")
+	}
+}
+
+func TestEnsureDefaultMethod_ReusesTheExistingCODMethodAndKeepsItSwitchedOff(t *testing.T) {
+	tenant := uuid.New()
+	existing := model.Method{
+		ID: uuid.New(), TenantID: tenant,
+		Type: model.TypeCOD, Provider: model.ProviderOffline,
+		DisplayName: "Pay on delivery", Enabled: false,
+	}
+	repo := &fakeRepo{methods: []model.Method{existing}}
+
+	id, err := New(repo).EnsureDefaultMethod(t.Context(), tenant)
+	if err != nil {
+		t.Fatalf("EnsureDefaultMethod: %v", err)
+	}
+	if id != existing.ID {
+		t.Errorf("id = %s, want the existing method %s", id, existing.ID)
+	}
+	if repo.created != nil {
+		t.Error("a second COD method was created")
+	}
+	if repo.methods[0].Enabled {
+		t.Error("the customer's switched-off COD method was re-enabled")
+	}
+}
+
+func TestEnsureDefaultMethod_IgnoresAnotherTenantsCODMethod(t *testing.T) {
+	other := model.Method{
+		ID: uuid.New(), TenantID: uuid.New(),
+		Type: model.TypeCOD, Provider: model.ProviderOffline, Enabled: true,
+	}
+	repo := &fakeRepo{methods: []model.Method{other}}
+
+	id, err := New(repo).EnsureDefaultMethod(t.Context(), uuid.New())
+	if err != nil {
+		t.Fatalf("EnsureDefaultMethod: %v", err)
+	}
+	if id == other.ID {
+		t.Fatal("another tenant's payment method was linked")
+	}
+	if repo.created == nil {
+		t.Fatal("no method was created for the caller's tenant")
+	}
 }

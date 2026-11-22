@@ -27,5 +27,9 @@ func RegisterRoutes(group *gin.RouterGroup, h *handler.Handler, auth middleware.
 	g.PATCH("/:id", h.Patch)
 	g.DELETE("/:id", h.Delete)
 	g.GET("/:id/pages", h.Pages)
+	g.GET("/:id/assets", h.ListAssets)
 	g.POST("/:id/assets", h.UploadAsset)
+	g.DELETE("/:id/assets", h.DeleteAsset)
+	g.GET("/:id/store-settings", h.GetStoreSettings)
+	g.PATCH("/:id/store-settings", h.PatchStoreSettings)
 }

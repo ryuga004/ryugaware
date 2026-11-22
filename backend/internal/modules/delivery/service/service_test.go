@@ -277,13 +277,97 @@ func TestList_PageSizeIsClamped(t *testing.T) {
 	}
 }
 
-func (f *fakeRepo) EnabledIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error) {
+func (f *fakeRepo) ByPartner(ctx context.Context, tenantID uuid.UUID, partner string) (*model.Method, error) {
 	f.lastTenant = tenantID
-	ids := make([]uuid.UUID, 0, len(f.methods))
 	for i := range f.methods {
-		if f.methods[i].TenantID == tenantID && f.methods[i].Enabled {
-			ids = append(ids, f.methods[i].ID)
+		m := &f.methods[i]
+		if m.TenantID == tenantID && m.Partner == partner {
+			return m, nil
 		}
 	}
-	return ids, nil
+	return nil, nil
+}
+
+func (f *fakeRepo) ByName(ctx context.Context, tenantID uuid.UUID, name string) (*model.Method, error) {
+	f.lastTenant = tenantID
+	for i := range f.methods {
+		m := &f.methods[i]
+		if m.TenantID == tenantID && m.Name == name {
+			return m, nil
+		}
+	}
+	return nil, nil
+}
+
+func TestEnsureDefaultMethod_CreatesAFreeStorePickupWhenTheTenantHasNone(t *testing.T) {
+	repo := &fakeRepo{}
+	tenant := uuid.New()
+
+	id, err := New(repo).EnsureDefaultMethod(t.Context(), tenant)
+	if err != nil {
+		t.Fatalf("EnsureDefaultMethod: %v", err)
+	}
+	if repo.created == nil {
+		t.Fatal("no method was created")
+	}
+	if repo.created.ID != id {
+		t.Errorf("returned id = %s, want the created method %s", id, repo.created.ID)
+	}
+	if repo.created.TenantID != tenant {
+		t.Errorf("tenant = %s, want %s", repo.created.TenantID, tenant)
+	}
+	if repo.created.Partner != model.PartnerPickup || repo.created.Type != model.TypePickup {
+		t.Errorf("created %s/%s, want %s/%s", repo.created.Partner, repo.created.Type, model.PartnerPickup, model.TypePickup)
+	}
+	if repo.created.RateType != model.RateFree || repo.created.Price != 0 {
+		t.Errorf("rate = %s at %.2f, want %s at 0", repo.created.RateType, repo.created.Price, model.RateFree)
+	}
+	if repo.created.FreeAbove != nil {
+		t.Error("a free method must not carry a free-above threshold")
+	}
+	if string(repo.created.Regions) != "[]" {
+		t.Errorf("regions = %q, want []", repo.created.Regions)
+	}
+	if !repo.created.Enabled {
+		t.Error("the default method was created switched off")
+	}
+}
+
+func TestEnsureDefaultMethod_ReusesTheTenantsOwnPickupMethod(t *testing.T) {
+	tenant := uuid.New()
+	existing := model.Method{
+		ID: uuid.New(), TenantID: tenant, Name: "Collect from Andheri",
+		Partner: model.PartnerPickup, Type: model.TypePickup, RateType: model.RateFree, Enabled: true,
+	}
+	repo := &fakeRepo{methods: []model.Method{existing}}
+
+	id, err := New(repo).EnsureDefaultMethod(t.Context(), tenant)
+	if err != nil {
+		t.Fatalf("EnsureDefaultMethod: %v", err)
+	}
+	if id != existing.ID {
+		t.Errorf("id = %s, want the existing method %s", id, existing.ID)
+	}
+	if repo.created != nil {
+		t.Error("a second pickup method was created")
+	}
+}
+
+func TestEnsureDefaultMethod_IgnoresAnotherTenantsPickupMethod(t *testing.T) {
+	other := model.Method{
+		ID: uuid.New(), TenantID: uuid.New(), Name: "Store pickup",
+		Partner: model.PartnerPickup, Type: model.TypePickup, RateType: model.RateFree, Enabled: true,
+	}
+	repo := &fakeRepo{methods: []model.Method{other}}
+
+	id, err := New(repo).EnsureDefaultMethod(t.Context(), uuid.New())
+	if err != nil {
+		t.Fatalf("EnsureDefaultMethod: %v", err)
+	}
+	if id == other.ID {
+		t.Fatal("another tenant's delivery method was linked")
+	}
+	if repo.created == nil {
+		t.Fatal("no method was created for the caller's tenant")
+	}
 }

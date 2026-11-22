@@ -49,7 +49,7 @@ export function EditorPanel({
   view: EditorView;
   onView: (view: EditorView) => void;
   actions: PanelActions;
-  /** Payments, delivery, sign-in and storage: platform records, scoped to this website. */
+  /** Payments and delivery: organisation records, scoped to this website. */
   store: StorePanelProps;
 }) {
   if (view.kind === "store") {
@@ -141,11 +141,8 @@ export function EditorPanel({
     return (
       <PanelShell title={page.title} description={def.description} onBack={() => onView({ kind: "root" })}>
         {def.governedBy === "signIn" && (
-          <div className="mb-5 flex items-center justify-between gap-3 rounded-md border border-line bg-page px-3.5 py-3">
-            <p className="text-sm text-muted">This page appears while customer sign-in is on.</p>
-            <Button size="sm" variant="secondary" onClick={() => onView({ kind: "store", section: "auth" })}>
-              Open setting
-            </Button>
+          <div className="mb-5 rounded-md border border-line bg-page px-3.5 py-3">
+            <p className="text-sm text-muted">This page belongs to customer accounts, which every website has.</p>
           </div>
         )}
         {!page.enabled && !def.governedBy && (
@@ -276,7 +273,7 @@ export function EditorPanel({
             <Row
               key={page.key}
               title={page.title}
-              hint={def?.governedBy ? "Follows Customer accounts" : page.kind === "content" ? `${page.sections.length} sections` : def?.description}
+              hint={def?.governedBy ? "Part of customer accounts" : page.kind === "content" ? `${page.sections.length} sections` : def?.description}
               muted={!page.enabled}
               onClick={() => onView({ kind: "page", pageKey: page.key })}
               action={

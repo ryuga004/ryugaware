@@ -54,10 +54,17 @@ export const toDeliveryOption = (option: WebsiteDeliveryOption): CheckoutDeliver
   mark: DELIVERY_MARK[option.type],
 });
 
+/**
+ * Shopper sign-in is not configurable yet: the backend's storefront read returns the same constant
+ * (`websites/handler/content.go`). The preview uses it so the editor cannot show a different
+ * checkout from the live website. It becomes a real setting when the authentication module lands.
+ */
+const SIGN_IN: StoreCommerce["signIn"] = { email: true, google: false };
+
 export function toCommerce(settings: WebsiteStoreSettings): StoreCommerce {
   return {
     payments: settings.payments.filter((p) => p.selected).map(toPaymentOption),
     delivery: settings.delivery.filter((d) => d.selected).map(toDeliveryOption),
-    signIn: { email: settings.auth.email, google: settings.auth.google },
+    signIn: SIGN_IN,
   };
 }

@@ -57,7 +57,7 @@ export const websitesApi = baseApi.injectEndpoints({
         return { url: `/websites/${websiteId}/assets`, method: "POST", body };
       },
       transformResponse: unwrap<Asset>,
-      invalidatesTags: ["StorageConfig"],
+      invalidatesTags: (_r, _e, { websiteId }) => [{ type: "Asset", id: websiteId }, "StorageConfig"],
     }),
 
     createWebsite: build.mutation<Website, CreateWebsiteInput>({

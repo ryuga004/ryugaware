@@ -106,7 +106,7 @@ Scale (do not invent sizes):
 | Nothing yet / no results | `EmptyState` with `illustration` |
 | Load failure | `ErrorState` with `onRetry` |
 | Whole-page 404 / service unavailable | `StatusScreen` (wired up in `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`) |
-| Picture chosen by the customer (logo, section art) | `ImageUpload` |
+| Picture chosen by the customer (logo, section art) | `ImageUpload` — pass `upload` to store the file in the website's own folder, and `onBrowse` to add a *Choose existing* button that reopens an already-uploaded picture |
 | Numbers | `StatTile` / `StatGrid`, charts from `Charts.tsx` (always with the table view) |
 
 Merge classes with `cn()` from `@/lib/cn`; components accept `className` for layout tweaks, not to restyle their colors.

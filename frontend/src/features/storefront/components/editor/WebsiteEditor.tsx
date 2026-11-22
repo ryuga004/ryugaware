@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, Rocket } from "lucide-react";
 import { ConfirmDialog } from "@/components/platform/ConfirmDialog";
@@ -14,8 +14,10 @@ import { useGetStoreSettingsQuery, useUpdateStoreSettingsMutation } from "@/feat
 import { toCommerce } from "@/features/website-settings/commerce";
 import { pushToast } from "@/features/ui/slice";
 import { cn } from "@/lib/cn";
+import { pluralize } from "@/lib/format";
 import { useAppDispatch } from "@/store/hooks";
 import { useGetSiteContentQuery, useSaveSiteContentMutation } from "../../api";
+import { commitAssets, pendingAssets } from "../../assets";
 import * as ops from "../../editorOps";
 import { getTemplate } from "../../templates";
 import type { SiteContent } from "../../types";
@@ -46,6 +48,9 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
     async (file: File) => (await uploadAsset({ websiteId, file }).unwrap()).url,
     [uploadAsset, websiteId],
   );
+  // No `upload` here on purpose: a picked picture stays a data URL in the draft and reaches S3 only
+  // when the customer saves, so a discarded edit leaves nothing behind in the bucket.
+  const assets = useMemo(() => ({ websiteId }), [websiteId]);
   const [updateWebsite, { isLoading: publishing }] = useUpdateWebsiteMutation();
 
   // The draft only exists once something has been edited; until then the loaded content is shown.
@@ -55,11 +60,15 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [path, setPath] = useState("/");
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [uploadingAssets, setUploadingAssets] = useState<{ done: number; total: number } | null>(null);
 
   const site = edited ?? content.data;
   // The preview shows the same payment, delivery and sign-in options a shopper would get.
   const commerce = storeSettings.data ? toCommerce(storeSettings.data) : undefined;
   const dirty = edited !== null && content.data !== undefined && JSON.stringify(edited) !== JSON.stringify(content.data);
+  // Pictures chosen but not uploaded yet. They live in the draft and the preview only.
+  const waiting = site ? pendingAssets(site).length : 0;
+  const busy = saving || publishing || uploadingAssets !== null;
 
   const edit = useCallback(
     (fn: (current: SiteContent) => SiteContent) => setEdited((current) => (current ? fn(current) : content.data ? fn(content.data) : null)),
@@ -92,15 +101,46 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
     if (next.kind !== "root") setTab("edit");
   };
 
+  /**
+   * Uploads the pictures chosen since the last save, then returns the draft pointing at them.
+   * Returns null when an upload failed — the content must not be saved still holding a data URL.
+   * The committed draft is kept either way, so retrying never uploads the same picture twice.
+   */
+  const commit = async (current: SiteContent) => {
+    const total = pendingAssets(current).length;
+    if (total === 0) return current;
+    setUploadingAssets({ done: 0, total });
+    try {
+      const committed = await commitAssets(current, upload, (done, total) => setUploadingAssets({ done, total }));
+      setEdited(committed);
+      return committed;
+    } catch {
+      dispatch(
+        pushToast({
+          tone: "error",
+          title: "Couldn’t upload your pictures",
+          description: "Nothing was saved. Check your connection and try again.",
+        }),
+      );
+      return null;
+    } finally {
+      setUploadingAssets(null);
+    }
+  };
+
   const onSave = async () => {
     if (!site) return;
-    await save({ websiteId, content: site }).unwrap().catch(() => null);
+    const committed = await commit(site);
+    if (!committed) return;
+    await save({ websiteId, content: committed }).unwrap().catch(() => null);
     setEdited(null);
   };
 
   const onPublish = async () => {
     if (!site) return;
-    await save({ websiteId, content: site }).unwrap().catch(() => null);
+    const committed = await commit(site);
+    if (!committed) return;
+    await save({ websiteId, content: committed }).unwrap().catch(() => null);
     setEdited(null);
     await updateWebsite({ id: websiteId, patch: { publish: true } }).unwrap().catch(() => null);
   };
@@ -142,7 +182,11 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
           ) : (
             <Skeleton className="h-5 w-40 max-sm:hidden" />
           )}
-          {dirty && <span className="text-xs whitespace-nowrap text-muted max-sm:hidden">Unsaved changes</span>}
+          {dirty && (
+            <span className="text-xs whitespace-nowrap text-muted max-sm:hidden">
+              {waiting > 0 ? `${pluralize(waiting, "picture")} will upload when you save` : "Unsaved changes"}
+            </span>
+          )}
         </div>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
@@ -169,12 +213,20 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
             </a>
           )}
           {dirty && (
-            <Button variant="ghost" size="sm" onClick={() => setEdited(null)} disabled={saving || publishing}>
+            <Button variant="ghost" size="sm" onClick={() => setEdited(null)} disabled={busy}>
               Discard
             </Button>
           )}
-          <Button size="sm" onClick={onSave} loading={saving} disabled={!dirty || publishing}>
-            {saving ? "Saving…" : <>Save<span className="max-sm:hidden">&nbsp;changes</span></>}
+          <Button size="sm" onClick={onSave} loading={saving || uploadingAssets !== null} disabled={!dirty || publishing}>
+            {uploadingAssets ? (
+              `Uploading ${Math.min(uploadingAssets.done + 1, uploadingAssets.total)} of ${uploadingAssets.total}…`
+            ) : saving ? (
+              "Saving…"
+            ) : (
+              <>
+                Save<span className="max-sm:hidden">&nbsp;changes</span>
+              </>
+            )}
           </Button>
           <Button
             variant="secondary"
@@ -182,7 +234,7 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
             leftIcon={<Rocket className="size-4" />}
             onClick={onPublish}
             loading={publishing}
-            disabled={saving}
+            disabled={busy && !publishing}
             className="max-sm:hidden"
           >
             {publishing ? "Publishing…" : "Publish"}
@@ -193,7 +245,7 @@ export function WebsiteEditor({ websiteId }: { websiteId: string }) {
       <div className="flex min-h-0 flex-1">
         <aside className={cn("w-full shrink-0 overflow-y-auto border-line bg-page md:w-[348px] md:border-r", tab === "preview" && "max-md:hidden")}>
           {site && manifest ? (
-            <AssetUploadProvider value={upload}>
+            <AssetUploadProvider value={assets}>
               <EditorPanel
                 site={site}
                 manifest={manifest}

@@ -121,3 +121,15 @@ func (r *Repository) EnabledIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid
 	}
 	return ids, nil
 }
+
+func (r *Repository) ByTypeProvider(ctx context.Context, tenantID uuid.UUID, kind, provider string) (*model.Method, error) {
+	var m model.Method
+	err := r.scoped(ctx, tenantID).Where("type = ? AND provider = ?", kind, provider).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("payments: method by type and provider: %w", err)
+	}
+	return &m, nil
+}

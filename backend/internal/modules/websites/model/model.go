@@ -115,3 +115,32 @@ type DeliveryOption struct {
 	Price     float64   `gorm:"column:price"`
 	FreeAbove *float64  `gorm:"column:free_above"`
 }
+
+type PaymentChoice struct {
+	ID          uuid.UUID `gorm:"column:id"`
+	Type        string    `gorm:"column:type"`
+	Provider    string    `gorm:"column:provider"`
+	DisplayName string    `gorm:"column:display_name"`
+	Enabled     bool      `gorm:"column:enabled"`
+	TestMode    bool      `gorm:"column:test_mode"`
+	FeePercent  float64   `gorm:"column:fee_percent"`
+	FeeFixed    float64   `gorm:"column:fee_fixed"`
+	MinOrder    *float64  `gorm:"column:min_order"`
+	MaxOrder    *float64  `gorm:"column:max_order"`
+	Selected    bool      `gorm:"column:selected"`
+}
+
+type DeliveryChoice struct {
+	ID        uuid.UUID `gorm:"column:id"`
+	Name      string    `gorm:"column:name"`
+	Partner   string    `gorm:"column:partner"`
+	Type      string    `gorm:"column:type"`
+	MinDays   int16     `gorm:"column:min_days"`
+	MaxDays   int16     `gorm:"column:max_days"`
+	RateType  string    `gorm:"column:rate_type"`
+	Price     float64   `gorm:"column:price"`
+	FreeAbove *float64  `gorm:"column:free_above"`
+	Coverage  string    `gorm:"column:coverage"`
+	Enabled   bool      `gorm:"column:enabled"`
+	Selected  bool      `gorm:"column:selected"`
+}

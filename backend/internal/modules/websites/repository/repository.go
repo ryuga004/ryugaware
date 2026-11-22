@@ -8,10 +8,13 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/ryuga/ryugaware/backend/internal/modules/websites/model"
 	"github.com/ryuga/ryugaware/backend/internal/platform/database"
 )
+
+const MaxMethodsPerWebsite = 100
 
 type Repository struct {
 	db *gorm.DB
@@ -317,4 +320,74 @@ func (r *Repository) DeliveryOptions(ctx context.Context, tenantID, websiteID uu
 		return nil, fmt.Errorf("websites: delivery options: %w", err)
 	}
 	return out, nil
+}
+
+func (r *Repository) PaymentChoices(ctx context.Context, tenantID, websiteID uuid.UUID) ([]model.PaymentChoice, error) {
+	out := make([]model.PaymentChoice, 0, 8)
+	err := r.db.WithContext(ctx).
+		Table("payment_methods pm").
+		Select("pm.id, pm.type, pm.provider, pm.display_name, pm.enabled, pm.test_mode, pm.fee_percent, pm.fee_fixed, pm.min_order, pm.max_order, (wpm.website_id IS NOT NULL) AS selected").
+		Joins("LEFT JOIN website_payment_methods wpm ON wpm.payment_method_id = pm.id AND wpm.tenant_id = pm.tenant_id AND wpm.website_id = ?", websiteID).
+		Where("pm.tenant_id = ?", tenantID).
+		Order("pm.created_at ASC, pm.id ASC").
+		Limit(MaxMethodsPerWebsite).
+		Scan(&out).Error
+	if err != nil {
+		return nil, fmt.Errorf("websites: payment choices: %w", err)
+	}
+	return out, nil
+}
+
+func (r *Repository) DeliveryChoices(ctx context.Context, tenantID, websiteID uuid.UUID) ([]model.DeliveryChoice, error) {
+	out := make([]model.DeliveryChoice, 0, 8)
+	err := r.db.WithContext(ctx).
+		Table("delivery_methods dm").
+		Select("dm.id, dm.name, dm.partner, dm.type, dm.min_days, dm.max_days, dm.rate_type, dm.price, dm.free_above, dm.coverage, dm.enabled, (wdm.website_id IS NOT NULL) AS selected").
+		Joins("LEFT JOIN website_delivery_methods wdm ON wdm.delivery_method_id = dm.id AND wdm.tenant_id = dm.tenant_id AND wdm.website_id = ?", websiteID).
+		Where("dm.tenant_id = ?", tenantID).
+		Order("dm.created_at ASC, dm.id ASC").
+		Limit(MaxMethodsPerWebsite).
+		Scan(&out).Error
+	if err != nil {
+		return nil, fmt.Errorf("websites: delivery choices: %w", err)
+	}
+	return out, nil
+}
+
+func (r *Repository) SelectPaymentMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID, at time.Time) error {
+	link := model.PaymentLink{WebsiteID: websiteID, PaymentMethodID: methodID, TenantID: tenantID, CreatedAt: at}
+	err := r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&link).Error
+	if err != nil {
+		return fmt.Errorf("websites: select payment method: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeselectPaymentMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID) error {
+	err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND website_id = ? AND payment_method_id = ?", tenantID, websiteID, methodID).
+		Delete(&model.PaymentLink{}).Error
+	if err != nil {
+		return fmt.Errorf("websites: deselect payment method: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) SelectDeliveryMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID, at time.Time) error {
+	link := model.DeliveryLink{WebsiteID: websiteID, DeliveryMethodID: methodID, TenantID: tenantID, CreatedAt: at}
+	err := r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&link).Error
+	if err != nil {
+		return fmt.Errorf("websites: select delivery method: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeselectDeliveryMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID) error {
+	err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND website_id = ? AND delivery_method_id = ?", tenantID, websiteID, methodID).
+		Delete(&model.DeliveryLink{}).Error
+	if err != nil {
+		return fmt.Errorf("websites: deselect delivery method: %w", err)
+	}
+	return nil
 }

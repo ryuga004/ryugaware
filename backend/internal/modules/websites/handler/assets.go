@@ -6,6 +6,7 @@ import (
 	"github.com/ryuga/ryugaware/backend/internal/modules/websites/dto"
 	"github.com/ryuga/ryugaware/backend/internal/modules/websites/service"
 	"github.com/ryuga/ryugaware/backend/internal/shared/apperrors"
+	"github.com/ryuga/ryugaware/backend/internal/shared/binding"
 	"github.com/ryuga/ryugaware/backend/internal/shared/response"
 )
 
@@ -79,4 +80,70 @@ func (h *Handler) Storage(c *gin.Context) {
 		Objects:    usage.Objects,
 		QuotaBytes: usage.QuotaBytes,
 	})
+}
+
+func (h *Handler) ListAssets(c *gin.Context) {
+	tenantID, _, id, ok := scope(c)
+	if !ok {
+		response.Error(c, apperrors.Unauthorized("Sign in to continue"))
+		return
+	}
+
+	var q dto.AssetListQuery
+	if err := binding.Query(c, &q); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	listing, err := h.svc.ListAssets(c.Request.Context(), tenantID, id, q.Path)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	folders := make([]dto.AssetFolder, 0, len(listing.Folders))
+	for _, f := range listing.Folders {
+		folders = append(folders, dto.AssetFolder{Name: f.Name, Path: f.Path, Bytes: f.Bytes, Objects: f.Objects})
+	}
+	files := make([]dto.AssetFile, 0, len(listing.Files))
+	for _, f := range listing.Files {
+		files = append(files, dto.AssetFile{
+			Key:         f.Key,
+			Name:        f.Name,
+			URL:         f.URL,
+			Size:        f.Size,
+			ContentType: f.ContentType,
+			UpdatedAt:   f.UpdatedAt,
+		})
+	}
+
+	response.OK(c, dto.AssetListing{
+		WebsiteID: id.String(),
+		Path:      listing.Path,
+		Folders:   folders,
+		Files:     files,
+		Bytes:     listing.Bytes,
+		Objects:   listing.Objects,
+		Truncated: listing.Truncated,
+	})
+}
+
+func (h *Handler) DeleteAsset(c *gin.Context) {
+	tenantID, _, id, ok := scope(c)
+	if !ok {
+		response.Error(c, apperrors.Unauthorized("Sign in to continue"))
+		return
+	}
+
+	var q dto.AssetDeleteQuery
+	if err := binding.Query(c, &q); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	if err := h.svc.DeleteAsset(c.Request.Context(), tenantID, id, q.Key); err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.NoContent(c)
 }

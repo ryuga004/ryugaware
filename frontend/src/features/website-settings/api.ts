@@ -22,7 +22,6 @@ export const websiteSettingsApi = baseApi.injectEndpoints({
         { type: "SiteContent", id: websiteId },
         "PaymentMethod",
         "DeliveryMethod",
-        "AuthConfig",
         { type: "Website", id: websiteId },
       ],
       async onQueryStarted({ websiteId, patch }, { dispatch, queryFulfilled }) {
@@ -37,12 +36,6 @@ export const websiteSettingsApi = baseApi.injectEndpoints({
               const row = draft.delivery.find((d) => d.id === patch.delivery!.id);
               if (row) row.selected = patch.delivery.selected;
             }
-            if (patch.auth) {
-              draft.auth.overridden = patch.auth.overridden;
-              if (patch.auth.email !== undefined) draft.auth.email = patch.auth.email;
-              if (patch.auth.google !== undefined) draft.auth.google = patch.auth.google;
-            }
-            if (patch.storage) draft.storage.useConnected = patch.storage.useConnected;
           }),
         );
         try {

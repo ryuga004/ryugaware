@@ -13,6 +13,13 @@ const (
 )
 
 const (
+	TypeStandard = "standard"
+	TypeExpress  = "express"
+	TypeSameDay  = "same_day"
+	TypePickup   = "pickup"
+)
+
+const (
 	RateFlat      = "flat"
 	RateFree      = "free"
 	RateFreeAbove = "free_above"

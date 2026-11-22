@@ -124,3 +124,27 @@ func (r *Repository) EnabledIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid
 	}
 	return ids, nil
 }
+
+func (r *Repository) ByPartner(ctx context.Context, tenantID uuid.UUID, partner string) (*model.Method, error) {
+	var m model.Method
+	err := r.scoped(ctx, tenantID).Where("partner = ?", partner).Order("created_at ASC, id ASC").First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("delivery: method by partner: %w", err)
+	}
+	return &m, nil
+}
+
+func (r *Repository) ByName(ctx context.Context, tenantID uuid.UUID, name string) (*model.Method, error) {
+	var m model.Method
+	err := r.scoped(ctx, tenantID).Where("name = ?", name).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("delivery: method by name: %w", err)
+	}
+	return &m, nil
+}

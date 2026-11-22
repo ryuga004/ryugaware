@@ -96,6 +96,7 @@ export const TAG_TYPES = [
   "ContactDetails",
   "SiteContent",
   "StoreSettings",
+  "Asset",
 ] as const;
 export type TagType = (typeof TAG_TYPES)[number];
 

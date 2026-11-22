@@ -50,6 +50,12 @@ type Repo interface {
 	BySubdomain(ctx context.Context, subdomain string) (*model.WebsiteRow, error)
 	SaveContent(ctx context.Context, tx repository.Tx, tenantID, websiteID uuid.UUID, theme, chrome []byte, at time.Time) error
 	SavePage(ctx context.Context, tx repository.Tx, tenantID, websiteID uuid.UUID, key string, fields map[string]any) error
+	PaymentChoices(ctx context.Context, tenantID, websiteID uuid.UUID) ([]model.PaymentChoice, error)
+	DeliveryChoices(ctx context.Context, tenantID, websiteID uuid.UUID) ([]model.DeliveryChoice, error)
+	SelectPaymentMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID, at time.Time) error
+	DeselectPaymentMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID) error
+	SelectDeliveryMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID, at time.Time) error
+	DeselectDeliveryMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID) error
 	PaymentOptions(ctx context.Context, tenantID, websiteID uuid.UUID) ([]model.PaymentOption, error)
 	DeliveryOptions(ctx context.Context, tenantID, websiteID uuid.UUID) ([]model.DeliveryOption, error)
 }
@@ -60,7 +66,7 @@ type Licenses interface {
 }
 
 type Methods interface {
-	EnabledMethodIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error)
+	EnsureDefaultMethod(ctx context.Context, tenantID uuid.UUID) (uuid.UUID, error)
 }
 
 type Service struct {
@@ -123,13 +129,13 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*model.WebsiteRow
 		return nil, err
 	}
 
-	paymentIDs, err := s.payments.EnabledMethodIDs(ctx, in.TenantID)
+	paymentID, err := s.payments.EnsureDefaultMethod(ctx, in.TenantID)
 	if err != nil {
-		return nil, apperrors.Internal(err)
+		return nil, err
 	}
-	deliveryIDs, err := s.delivery.EnabledMethodIDs(ctx, in.TenantID)
+	deliveryID, err := s.delivery.EnsureDefaultMethod(ctx, in.TenantID)
 	if err != nil {
-		return nil, apperrors.Internal(err)
+		return nil, err
 	}
 
 	theme := template.Theme
@@ -208,17 +214,11 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*model.WebsiteRow
 		})
 	}
 
-	paymentLinks := make([]model.PaymentLink, 0, len(paymentIDs))
-	for _, id := range paymentIDs {
-		paymentLinks = append(paymentLinks, model.PaymentLink{
-			WebsiteID: websiteID, PaymentMethodID: id, TenantID: in.TenantID, CreatedAt: now,
-		})
+	paymentLinks := []model.PaymentLink{
+		{WebsiteID: websiteID, PaymentMethodID: paymentID, TenantID: in.TenantID, CreatedAt: now},
 	}
-	deliveryLinks := make([]model.DeliveryLink, 0, len(deliveryIDs))
-	for _, id := range deliveryIDs {
-		deliveryLinks = append(deliveryLinks, model.DeliveryLink{
-			WebsiteID: websiteID, DeliveryMethodID: id, TenantID: in.TenantID, CreatedAt: now,
-		})
+	deliveryLinks := []model.DeliveryLink{
+		{WebsiteID: websiteID, DeliveryMethodID: deliveryID, TenantID: in.TenantID, CreatedAt: now},
 	}
 
 	err = s.repo.InTransaction(ctx, func(tx repository.Tx) error {

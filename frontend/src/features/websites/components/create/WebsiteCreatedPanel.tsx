@@ -34,6 +34,11 @@ export function WebsiteCreatedPanel({ websiteId }: { websiteId: string }) {
               We copied the {website.templateName} template into your website. Everything in it is yours to change.
             </p>
 
+            <p className="mx-auto mt-4 max-w-sm text-sm text-muted">
+              It takes cash on delivery and store pickup to begin with. Open the editor to add UPI, cards or a
+              delivery partner you have already set up.
+            </p>
+
             <dl className="mt-7 divide-y divide-line rounded-card border border-line text-left">
               <Row label="Website" value={website.name} />
               <Row label="Web address" value={<span className="font-mono text-sm">{website.url.replace("https://", "")}</span>} />

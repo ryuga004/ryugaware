@@ -12,6 +12,7 @@ import (
 
 	"github.com/ryuga/ryugaware/backend/internal/modules/websites/model"
 	"github.com/ryuga/ryugaware/backend/internal/modules/websites/repository"
+	"github.com/ryuga/ryugaware/backend/internal/platform/storage"
 	"github.com/ryuga/ryugaware/backend/internal/shared/apperrors"
 )
 
@@ -25,6 +26,8 @@ type fakeRepo struct {
 	existing      int64
 	deleted       bool
 	lastTenant    uuid.UUID
+	payChoices    []model.PaymentChoice
+	delChoices    []model.DeliveryChoice
 }
 
 func (f *fakeRepo) InTransaction(ctx context.Context, fn func(tx repository.Tx) error) error {
@@ -97,10 +100,14 @@ func (f fakeLicenses) WebsiteAllowance(ctx context.Context, tenantID uuid.UUID) 
 	return f.allowance, f.err
 }
 
-type fakeMethods struct{ ids []uuid.UUID }
+type fakeMethods struct {
+	id      uuid.UUID
+	tenants []uuid.UUID
+}
 
-func (f fakeMethods) EnabledMethodIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error) {
-	return f.ids, nil
+func (f *fakeMethods) EnsureDefaultMethod(ctx context.Context, tenantID uuid.UUID) (uuid.UUID, error) {
+	f.tenants = append(f.tenants, tenantID)
+	return f.id, nil
 }
 
 func seededRepo() *fakeRepo {
@@ -117,8 +124,8 @@ func seededRepo() *fakeRepo {
 	}
 }
 
-func newSvc(repo *fakeRepo, allowance int, pay, del []uuid.UUID) *Service {
-	return New(repo, fakeLicenses{allowance: allowance}, fakeMethods{ids: pay}, fakeMethods{ids: del}, nil)
+func newSvc(repo *fakeRepo, allowance int) *Service {
+	return New(repo, fakeLicenses{allowance: allowance}, &fakeMethods{id: uuid.New()}, &fakeMethods{id: uuid.New()}, nil)
 }
 
 func validCreate(tenant uuid.UUID) CreateInput {
@@ -131,7 +138,7 @@ func validCreate(tenant uuid.UUID) CreateInput {
 func TestCreate_CopiesTemplateStructureAndStartsAsDraft(t *testing.T) {
 	repo := seededRepo()
 	tenant := uuid.New()
-	svc := newSvc(repo, 3, nil, nil)
+	svc := newSvc(repo, 3)
 
 	w, err := svc.Create(t.Context(), validCreate(tenant))
 	if err != nil {
@@ -160,7 +167,7 @@ func TestCreate_CopiesTemplateStructureAndStartsAsDraft(t *testing.T) {
 func TestCreate_StoragePrefixIsScopedToTenantAndWebsite(t *testing.T) {
 	repo := seededRepo()
 	tenant := uuid.New()
-	w, err := newSvc(repo, 3, nil, nil).Create(t.Context(), validCreate(tenant))
+	w, err := newSvc(repo, 3).Create(t.Context(), validCreate(tenant))
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -189,7 +196,7 @@ func TestCreate_LicenceLimitIsEnforced(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := seededRepo()
 			repo.existing = tc.existing
-			_, err := newSvc(repo, tc.allowance, nil, nil).Create(t.Context(), validCreate(uuid.New()))
+			_, err := newSvc(repo, tc.allowance).Create(t.Context(), validCreate(uuid.New()))
 			if tc.wantErr {
 				if !apperrors.IsCode(err, apperrors.CodeForbidden) {
 					t.Fatalf("err = %v, want %s", err, apperrors.CodeForbidden)
@@ -206,36 +213,50 @@ func TestCreate_LicenceLimitIsEnforced(t *testing.T) {
 	}
 }
 
-func TestCreate_LinksTheTenantsEnabledMethods(t *testing.T) {
+func TestCreate_LinksOnlyTheDefaultPaymentAndDeliveryMethod(t *testing.T) {
 	repo := seededRepo()
 	tenant := uuid.New()
-	pay := []uuid.UUID{uuid.New(), uuid.New()}
-	del := []uuid.UUID{uuid.New()}
+	pay, del := uuid.New(), uuid.New()
 
-	w, err := newSvc(repo, 3, pay, del).Create(t.Context(), validCreate(tenant))
+	svc := New(repo, fakeLicenses{allowance: 3}, &fakeMethods{id: pay}, &fakeMethods{id: del}, nil)
+	w, err := svc.Create(t.Context(), validCreate(tenant))
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if len(repo.paymentLinks) != len(pay) {
-		t.Errorf("payment links = %d, want %d", len(repo.paymentLinks), len(pay))
+	if len(repo.paymentLinks) != 1 {
+		t.Fatalf("payment links = %d, want 1", len(repo.paymentLinks))
 	}
-	if len(repo.deliveryLinks) != len(del) {
-		t.Errorf("delivery links = %d, want %d", len(repo.deliveryLinks), len(del))
+	if len(repo.deliveryLinks) != 1 {
+		t.Fatalf("delivery links = %d, want 1", len(repo.deliveryLinks))
 	}
-	for _, l := range repo.paymentLinks {
-		if l.WebsiteID != w.ID || l.TenantID != tenant {
-			t.Error("a payment link is not scoped to the new website and tenant")
-		}
+	if repo.paymentLinks[0].PaymentMethodID != pay {
+		t.Errorf("payment link = %s, want the default method %s", repo.paymentLinks[0].PaymentMethodID, pay)
+	}
+	if repo.deliveryLinks[0].DeliveryMethodID != del {
+		t.Errorf("delivery link = %s, want the default method %s", repo.deliveryLinks[0].DeliveryMethodID, del)
+	}
+	if repo.paymentLinks[0].WebsiteID != w.ID || repo.paymentLinks[0].TenantID != tenant {
+		t.Error("the payment link is not scoped to the new website and tenant")
+	}
+	if repo.deliveryLinks[0].WebsiteID != w.ID || repo.deliveryLinks[0].TenantID != tenant {
+		t.Error("the delivery link is not scoped to the new website and tenant")
 	}
 }
 
-func TestCreate_NoMethodsMeansNoLinks(t *testing.T) {
+func TestCreate_AsksForTheDefaultsWithTheCallersTenant(t *testing.T) {
 	repo := seededRepo()
-	if _, err := newSvc(repo, 3, nil, nil).Create(t.Context(), validCreate(uuid.New())); err != nil {
+	tenant := uuid.New()
+	payments := &fakeMethods{id: uuid.New()}
+	delivery := &fakeMethods{id: uuid.New()}
+
+	svc := New(repo, fakeLicenses{allowance: 3}, payments, delivery, nil)
+	if _, err := svc.Create(t.Context(), validCreate(tenant)); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if len(repo.paymentLinks) != 0 || len(repo.deliveryLinks) != 0 {
-		t.Error("links were created for a tenant with no methods")
+	for name, got := range map[string][]uuid.UUID{"payments": payments.tenants, "delivery": delivery.tenants} {
+		if len(got) != 1 || got[0] != tenant {
+			t.Errorf("%s default was asked for with %v, want exactly [%s]", name, got, tenant)
+		}
 	}
 }
 
@@ -244,7 +265,7 @@ func TestCreate_DisabledPagesAreCopiedSwitchedOff(t *testing.T) {
 	in := validCreate(uuid.New())
 	in.DisabledPage = map[string]bool{"shop": true}
 
-	if _, err := newSvc(repo, 3, nil, nil).Create(t.Context(), in); err != nil {
+	if _, err := newSvc(repo, 3).Create(t.Context(), in); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 	for _, p := range repo.pages {
@@ -262,7 +283,7 @@ func TestCreate_ThemeOverridesMergeOntoTheTemplateDefault(t *testing.T) {
 	in := validCreate(uuid.New())
 	in.Theme = map[string]any{"brandName": "Bloom", "primary": "#aa0000"}
 
-	w, err := newSvc(repo, 3, nil, nil).Create(t.Context(), in)
+	w, err := newSvc(repo, 3).Create(t.Context(), in)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -283,7 +304,7 @@ func TestCreate_UnknownTemplateIsNotFound(t *testing.T) {
 	in := validCreate(uuid.New())
 	in.TemplateSlug = "does_not_exist"
 
-	_, err := newSvc(repo, 3, nil, nil).Create(t.Context(), in)
+	_, err := newSvc(repo, 3).Create(t.Context(), in)
 	if !apperrors.IsCode(err, apperrors.CodeNotFound) {
 		t.Fatalf("err = %v, want %s", err, apperrors.CodeNotFound)
 	}
@@ -310,7 +331,7 @@ func TestCreate_SubdomainRules(t *testing.T) {
 			repo := seededRepo()
 			in := validCreate(uuid.New())
 			in.Subdomain = tc.subdomain
-			_, err := newSvc(repo, 3, nil, nil).Create(t.Context(), in)
+			_, err := newSvc(repo, 3).Create(t.Context(), in)
 			if tc.valid && err != nil {
 				t.Fatalf("Create: %v", err)
 			}
@@ -326,7 +347,7 @@ func TestCreate_SubdomainIsLowercasedBeforeValidation(t *testing.T) {
 	in := validCreate(uuid.New())
 	in.Subdomain = "  Bloom-Studio  "
 
-	w, err := newSvc(repo, 3, nil, nil).Create(t.Context(), in)
+	w, err := newSvc(repo, 3).Create(t.Context(), in)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -338,12 +359,12 @@ func TestCreate_SubdomainIsLowercasedBeforeValidation(t *testing.T) {
 func TestGet_AnotherTenantsWebsiteIsNotFound(t *testing.T) {
 	repo := seededRepo()
 	owner, other := uuid.New(), uuid.New()
-	w, err := newSvc(repo, 3, nil, nil).Create(t.Context(), validCreate(owner))
+	w, err := newSvc(repo, 3).Create(t.Context(), validCreate(owner))
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
-	svc := newSvc(repo, 3, nil, nil)
+	svc := newSvc(repo, 3)
 	if _, err := svc.Get(t.Context(), other, w.ID); !apperrors.IsCode(err, apperrors.CodeNotFound) {
 		t.Fatalf("other tenant: err = %v, want %s", err, apperrors.CodeNotFound)
 	}
@@ -355,9 +376,9 @@ func TestGet_AnotherTenantsWebsiteIsNotFound(t *testing.T) {
 func TestPages_AnotherTenantIsNotFound(t *testing.T) {
 	repo := seededRepo()
 	owner, other := uuid.New(), uuid.New()
-	w, _ := newSvc(repo, 3, nil, nil).Create(t.Context(), validCreate(owner))
+	w, _ := newSvc(repo, 3).Create(t.Context(), validCreate(owner))
 
-	_, err := newSvc(repo, 3, nil, nil).Pages(t.Context(), other, w.ID)
+	_, err := newSvc(repo, 3).Pages(t.Context(), other, w.ID)
 	if !apperrors.IsCode(err, apperrors.CodeNotFound) {
 		t.Fatalf("err = %v, want %s", err, apperrors.CodeNotFound)
 	}
@@ -366,9 +387,9 @@ func TestPages_AnotherTenantIsNotFound(t *testing.T) {
 func TestDelete_AnotherTenantIsNotFound(t *testing.T) {
 	repo := seededRepo()
 	owner, other := uuid.New(), uuid.New()
-	w, _ := newSvc(repo, 3, nil, nil).Create(t.Context(), validCreate(owner))
+	w, _ := newSvc(repo, 3).Create(t.Context(), validCreate(owner))
 
-	if err := newSvc(repo, 3, nil, nil).Delete(t.Context(), other, w.ID); !apperrors.IsCode(err, apperrors.CodeNotFound) {
+	if err := newSvc(repo, 3).Delete(t.Context(), other, w.ID); !apperrors.IsCode(err, apperrors.CodeNotFound) {
 		t.Fatalf("err = %v, want %s", err, apperrors.CodeNotFound)
 	}
 	if repo.deleted {
@@ -387,7 +408,7 @@ func (f *fakeRepo) SubdomainTaken(ctx context.Context, subdomain string) (bool, 
 
 func TestCheckSubdomain(t *testing.T) {
 	repo := seededRepo()
-	svc := newSvc(repo, 5, nil, nil)
+	svc := newSvc(repo, 5)
 	if _, err := svc.Create(t.Context(), validCreate(uuid.New())); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -463,4 +484,302 @@ func (f *fakeRepo) DeliveryOptions(ctx context.Context, tenantID, websiteID uuid
 
 func (f fakeLicenses) StorageLimitBytes(ctx context.Context, tenantID uuid.UUID) (int64, error) {
 	return 10 << 30, nil
+}
+
+func (f *fakeRepo) PaymentChoices(ctx context.Context, tenantID, websiteID uuid.UUID) ([]model.PaymentChoice, error) {
+	f.lastTenant = tenantID
+	return f.payChoices, nil
+}
+
+func (f *fakeRepo) DeliveryChoices(ctx context.Context, tenantID, websiteID uuid.UUID) ([]model.DeliveryChoice, error) {
+	f.lastTenant = tenantID
+	return f.delChoices, nil
+}
+
+func (f *fakeRepo) SelectPaymentMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID, at time.Time) error {
+	for i := range f.payChoices {
+		if f.payChoices[i].ID == methodID {
+			f.payChoices[i].Selected = true
+		}
+	}
+	return nil
+}
+
+func (f *fakeRepo) DeselectPaymentMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID) error {
+	for i := range f.payChoices {
+		if f.payChoices[i].ID == methodID {
+			f.payChoices[i].Selected = false
+		}
+	}
+	return nil
+}
+
+func (f *fakeRepo) SelectDeliveryMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID, at time.Time) error {
+	for i := range f.delChoices {
+		if f.delChoices[i].ID == methodID {
+			f.delChoices[i].Selected = true
+		}
+	}
+	return nil
+}
+
+func (f *fakeRepo) DeselectDeliveryMethod(ctx context.Context, tenantID, websiteID, methodID uuid.UUID) error {
+	for i := range f.delChoices {
+		if f.delChoices[i].ID == methodID {
+			f.delChoices[i].Selected = false
+		}
+	}
+	return nil
+}
+
+func storeRepo(tenant, website uuid.UUID, cod, upi, pickup uuid.UUID) *fakeRepo {
+	repo := seededRepo()
+	repo.websites = []model.WebsiteRow{{Website: model.Website{ID: website, TenantID: tenant}}}
+	repo.payChoices = []model.PaymentChoice{
+		{ID: cod, Type: "cod", Provider: "offline", DisplayName: "Cash on delivery", Enabled: true, Selected: true},
+		{ID: upi, Type: "upi", Provider: "phonepe", DisplayName: "UPI", Enabled: true, Selected: false},
+	}
+	repo.delChoices = []model.DeliveryChoice{
+		{ID: pickup, Name: "Store pickup", Partner: "pickup", Type: "pickup", RateType: "free", Enabled: true, Selected: true},
+	}
+	return repo
+}
+
+func TestStoreSettings_AnotherTenantGetsNotFound(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	repo := storeRepo(tenant, website, uuid.New(), uuid.New(), uuid.New())
+
+	_, err := newSvc(repo, 3).StoreSettings(t.Context(), uuid.New(), website)
+	if !apperrors.IsCode(err, apperrors.CodeNotFound) {
+		t.Fatalf("err = %v, want not_found", err)
+	}
+}
+
+func TestUpdateStoreSettings_SelectsAMethodTheCustomerChose(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	cod, upi, pickup := uuid.New(), uuid.New(), uuid.New()
+	repo := storeRepo(tenant, website, cod, upi, pickup)
+
+	out, err := newSvc(repo, 3).UpdateStoreSettings(t.Context(), tenant, website,
+		StorePatch{Payment: &MethodSelection{ID: upi, Selected: true}})
+	if err != nil {
+		t.Fatalf("UpdateStoreSettings: %v", err)
+	}
+	for _, p := range out.Payments {
+		if p.ID == upi && !p.Selected {
+			t.Error("UPI was not switched on for this website")
+		}
+		if p.ID == cod && !p.Selected {
+			t.Error("switching UPI on removed cash on delivery")
+		}
+	}
+}
+
+func TestUpdateStoreSettings_RefusesToRemoveTheLastPaymentMethod(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	cod, upi, pickup := uuid.New(), uuid.New(), uuid.New()
+	repo := storeRepo(tenant, website, cod, upi, pickup)
+
+	_, err := newSvc(repo, 3).UpdateStoreSettings(t.Context(), tenant, website,
+		StorePatch{Payment: &MethodSelection{ID: cod, Selected: false}})
+	if !apperrors.IsCode(err, apperrors.CodeValidation) {
+		t.Fatalf("err = %v, want validation_failed", err)
+	}
+	if !repo.payChoices[0].Selected {
+		t.Error("the last payment method was removed anyway")
+	}
+}
+
+func TestUpdateStoreSettings_RefusesToRemoveTheLastDeliveryMethod(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	cod, upi, pickup := uuid.New(), uuid.New(), uuid.New()
+	repo := storeRepo(tenant, website, cod, upi, pickup)
+
+	_, err := newSvc(repo, 3).UpdateStoreSettings(t.Context(), tenant, website,
+		StorePatch{Delivery: &MethodSelection{ID: pickup, Selected: false}})
+	if !apperrors.IsCode(err, apperrors.CodeValidation) {
+		t.Fatalf("err = %v, want validation_failed", err)
+	}
+	if !repo.delChoices[0].Selected {
+		t.Error("the last delivery method was removed anyway")
+	}
+}
+
+func TestUpdateStoreSettings_RemovesAMethodOnceAnotherIsOn(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	cod, upi, pickup := uuid.New(), uuid.New(), uuid.New()
+	repo := storeRepo(tenant, website, cod, upi, pickup)
+	repo.payChoices[1].Selected = true
+
+	out, err := newSvc(repo, 3).UpdateStoreSettings(t.Context(), tenant, website,
+		StorePatch{Payment: &MethodSelection{ID: cod, Selected: false}})
+	if err != nil {
+		t.Fatalf("UpdateStoreSettings: %v", err)
+	}
+	for _, p := range out.Payments {
+		if p.ID == cod && p.Selected {
+			t.Error("cash on delivery was not removed")
+		}
+	}
+}
+
+func TestUpdateStoreSettings_RejectsAMethodFromAnotherTenant(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	repo := storeRepo(tenant, website, uuid.New(), uuid.New(), uuid.New())
+
+	_, err := newSvc(repo, 3).UpdateStoreSettings(t.Context(), tenant, website,
+		StorePatch{Payment: &MethodSelection{ID: uuid.New(), Selected: true}})
+	if !apperrors.IsCode(err, apperrors.CodeNotFound) {
+		t.Fatalf("err = %v, want not_found", err)
+	}
+}
+
+func TestUpdateStoreSettings_AnEmptyPatchIsRejected(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	repo := storeRepo(tenant, website, uuid.New(), uuid.New(), uuid.New())
+
+	_, err := newSvc(repo, 3).UpdateStoreSettings(t.Context(), tenant, website, StorePatch{})
+	if !apperrors.IsCode(err, apperrors.CodeValidation) {
+		t.Fatalf("err = %v, want validation_failed", err)
+	}
+}
+
+type fakeStore struct {
+	objects []storage.Object
+	deleted []string
+}
+
+func (f *fakeStore) Put(ctx context.Context, in storage.PutInput) (storage.Object, error) {
+	return storage.Object{Key: in.Key, Size: in.Size, ContentType: in.ContentType}, nil
+}
+
+func (f *fakeStore) Delete(ctx context.Context, key string) error {
+	f.deleted = append(f.deleted, key)
+	return nil
+}
+
+func (f *fakeStore) DeletePrefix(ctx context.Context, prefix string) (int, error) { return 0, nil }
+
+func (f *fakeStore) List(ctx context.Context, prefix string, limit int) ([]storage.Object, error) {
+	out := make([]storage.Object, 0, len(f.objects))
+	for _, o := range f.objects {
+		if strings.HasPrefix(o.Key, prefix) {
+			out = append(out, o)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeStore) Usage(ctx context.Context, prefix string) (storage.Usage, error) {
+	return storage.Usage{}, nil
+}
+
+func (f *fakeStore) PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error) {
+	return "", nil
+}
+
+func (f *fakeStore) PublicURL(key string) string { return "https://cdn.example/" + key }
+
+func assetSvc(tenant, website uuid.UUID, keys ...string) (*Service, *fakeRepo, *fakeStore) {
+	prefix := storage.WebsitePrefix(tenant, website)
+	store := &fakeStore{}
+	for _, k := range keys {
+		store.objects = append(store.objects, storage.Object{Key: prefix + k, Size: 10, ContentType: "image/webp"})
+	}
+	repo := seededRepo()
+	repo.websites = []model.WebsiteRow{{
+		Website: model.Website{ID: website, TenantID: tenant, StoragePrefix: prefix},
+	}}
+	svc := New(repo, fakeLicenses{allowance: 3}, &fakeMethods{id: uuid.New()}, &fakeMethods{id: uuid.New()}, store)
+	return svc, repo, store
+}
+
+func TestListAssets_SplitsTheRootIntoFoldersAndFiles(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	svc, _, _ := assetSvc(tenant, website, "logo.webp", "media/hero.webp", "media/about.webp", "docs/terms.pdf")
+
+	listing, err := svc.ListAssets(t.Context(), tenant, website, "")
+	if err != nil {
+		t.Fatalf("ListAssets: %v", err)
+	}
+	if len(listing.Files) != 1 || listing.Files[0].Name != "logo.webp" {
+		t.Errorf("files = %+v, want only logo.webp", listing.Files)
+	}
+	if len(listing.Folders) != 2 {
+		t.Fatalf("folders = %d, want 2", len(listing.Folders))
+	}
+	if listing.Folders[0].Name != "docs" || listing.Folders[1].Name != "media" {
+		t.Errorf("folders = %+v, want docs then media", listing.Folders)
+	}
+	if listing.Folders[1].Objects != 2 {
+		t.Errorf("media holds %d objects, want 2", listing.Folders[1].Objects)
+	}
+	if listing.Objects != 4 {
+		t.Errorf("objects = %d, want 4", listing.Objects)
+	}
+}
+
+func TestListAssets_OpensAFolder(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	svc, _, _ := assetSvc(tenant, website, "logo.webp", "media/hero.webp", "media/about.webp")
+
+	listing, err := svc.ListAssets(t.Context(), tenant, website, "media")
+	if err != nil {
+		t.Fatalf("ListAssets: %v", err)
+	}
+	if listing.Path != "media/" {
+		t.Errorf("path = %q, want media/", listing.Path)
+	}
+	if len(listing.Files) != 2 || len(listing.Folders) != 0 {
+		t.Errorf("listing = %d files, %d folders, want 2 and 0", len(listing.Files), len(listing.Folders))
+	}
+	if listing.Files[0].URL == "" {
+		t.Error("a file was listed without a URL")
+	}
+}
+
+func TestListAssets_RejectsAPathThatClimbsOut(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	svc, _, _ := assetSvc(tenant, website, "logo.webp")
+
+	for _, at := range []string{"../", "media/../..", "media/other tenant"} {
+		if _, err := svc.ListAssets(t.Context(), tenant, website, at); !apperrors.IsCode(err, apperrors.CodeValidation) {
+			t.Errorf("ListAssets(%q) err = %v, want validation_failed", at, err)
+		}
+	}
+}
+
+func TestListAssets_AnotherTenantGetsNotFound(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	svc, _, _ := assetSvc(tenant, website, "logo.webp")
+
+	if _, err := svc.ListAssets(t.Context(), uuid.New(), website, ""); !apperrors.IsCode(err, apperrors.CodeNotFound) {
+		t.Fatalf("err = %v, want not_found", err)
+	}
+}
+
+func TestDeleteAsset_RefusesAKeyOutsideTheWebsitePrefix(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	svc, _, store := assetSvc(tenant, website, "logo.webp")
+	foreign := storage.WebsitePrefix(uuid.New(), uuid.New()) + "logo.webp"
+
+	if err := svc.DeleteAsset(t.Context(), tenant, website, foreign); !apperrors.IsCode(err, apperrors.CodeNotFound) {
+		t.Fatalf("err = %v, want not_found", err)
+	}
+	if len(store.deleted) != 0 {
+		t.Errorf("deleted %v, want nothing", store.deleted)
+	}
+}
+
+func TestDeleteAsset_RemovesTheWebsitesOwnFile(t *testing.T) {
+	tenant, website := uuid.New(), uuid.New()
+	svc, _, store := assetSvc(tenant, website, "media/hero.webp")
+	key := storage.WebsitePrefix(tenant, website) + "media/hero.webp"
+
+	if err := svc.DeleteAsset(t.Context(), tenant, website, key); err != nil {
+		t.Fatalf("DeleteAsset: %v", err)
+	}
+	if len(store.deleted) != 1 || store.deleted[0] != key {
+		t.Errorf("deleted = %v, want [%s]", store.deleted, key)
+	}
 }

@@ -3,7 +3,7 @@
 > **Source of truth.** Read this instead of re-reading the codebase.
 > Maintained per Rule 0 in [`AGENTS.md`](./AGENTS.md): update it in the same turn as any change.
 >
-> Last updated: 2026-11-19 · Go 1.27.4 · module `github.com/ryuga/ryugaware/backend`
+> Last updated: 2026-11-22 · Go 1.27.4 · module `github.com/ryuga/ryugaware/backend`
 
 ---
 
@@ -26,11 +26,11 @@
 | 12b | `templates` module | ✅ read-only catalogue (3 endpoints, 10 unit tests) |
 | 12c | `payments` module | ✅ CRUD + strategy/adapter, 11 unit tests. `process` makes **no gateway calls** |
 | 12d | `delivery` module | ✅ CRUD + partner adapters, 10 unit tests. `process` makes **no partner calls** |
-| 12e | `websites` module | ✅ create-from-template, CRUD, licence + bucket, 14 unit tests |
+| 12e | `websites` module | ✅ create-from-template, CRUD, licence + bucket, per-website store settings, asset browser, 27 unit tests |
 | 13 | `audit` module + consumer | ⬜ not started |
 | 14 | `notification` module + e-mail worker | ✅ worker delivers mail; **no admin endpoints** |
 | 15 | `internal/shared/middleware` + route registration | ✅ done |
-| 16 | Unit + integration tests | 🟨 114 unit tests + **12 integration tests** (`tests/integration`, `-tags integration`, skip without `TEST_POSTGRES_DSN`): websites repository SQL, template-content copy, content round-trip, storefront visibility, and S3 put/list/usage/prefix-delete (needs `TEST_S3_*`) |
+| 16 | Unit + integration tests | 🟨 133 unit tests + **12 integration tests** (`tests/integration`, `-tags integration`, skip without `TEST_POSTGRES_DSN`): websites repository SQL, template-content copy, content round-trip, storefront visibility, and S3 put/list/usage/prefix-delete (needs `TEST_S3_*`) |
 | 17 | Dockerfile + compose | 🟨 `compose.yaml` (postgres, redis, minio, mailpit) + `.env.example`; **no app Dockerfile** |
 | 18 | GitHub Actions CI/CD, Makefile, README | ⬜ not started |
 
@@ -95,10 +95,10 @@ token cannot carry stale privileges.
 | `internal/modules/auth/service` | verification, registration, sessions, passwords, JWT, bcrypt+pepper, platform-admin bootstrap, `license.go` (tenant licence + derived status/remaining) | ✅ |
 | `internal/modules/auth/handler` | 13 handlers, cookie handling | ✅ |
 | `internal/modules/templates/{model,dto,repository,service,handler}` | read-only template catalogue: visibility predicate, page-based list with category counts, slug/key lookups | ✅ |
-| `internal/modules/payments/{model,dto,repository,service,handler}` | tenant payment methods; `Strategy` per type (cod/upi/card) and `Gateway` adapter per provider | ✅ |
-| `internal/modules/delivery/{model,dto,repository,service,handler}` | tenant delivery methods; `Partner` adapter per integration (shiprocket/self/pickup), no strategy layer | ✅ |
-| `internal/platform/storage` | `Store` interface, S3/MinIO adapter (put/delete/delete-prefix/list/usage/presign), `WebsitePrefix` / `TenantPrefix` | 🟨 no caller yet |
-| `internal/modules/websites/{model,dto,repository,service,handler}` | create a website from a template reference (copying the template's content), CRUD, licence enforcement, storage prefix, payment/delivery links, site-content read/save, public storefront | ✅ |
+| `internal/modules/payments/{model,dto,repository,service,handler}` | tenant payment methods; `Strategy` per type (cod/upi/card) and `Gateway` adapter per provider; `EnsureDefaultMethod` find-or-creates the tenant's COD method | ✅ |
+| `internal/modules/delivery/{model,dto,repository,service,handler}` | tenant delivery methods; `Partner` adapter per integration (shiprocket/self/pickup), no strategy layer; `EnsureDefaultMethod` find-or-creates the tenant's store-pickup method | ✅ |
+| `internal/platform/storage` | `Store` interface, S3/MinIO adapter (put/delete/delete-prefix/list/usage/presign), `WebsitePrefix` / `TenantPrefix` | ✅ used by `websites` for upload, browse, delete and usage |
+| `internal/modules/websites/{model,dto,repository,service,handler}` | create a website from a template reference (copying the template's content), CRUD, licence enforcement, storage prefix, payment/delivery links, per-website store settings (`service/store.go`, `handler/store.go`), asset browse/delete, site-content read/save, public storefront | ✅ |
 | `internal/bootstrap` | router + middleware stack, module wiring, health, relay, graceful shutdown | ✅ |
 | `cmd/api` | config → logger → bootstrap → signal-driven shutdown | ✅ |
 | `cmd/migrate` | `up`/`down`/`drop`/`goto`/`force`/`version` over the embedded SQL, waits for Postgres | ✅ |
@@ -175,11 +175,15 @@ Live. Health is unversioned; everything else is under `/api/v1`. Request and res
 | GET | `/api/v1/templates` | session | catalogue list. Query `search`, `category`, `page`, `pageSize`. **Page-based, not cursor** (`backend-api.md` §5 exception): the UI needs a total count and random page access for its pager. `meta` carries `categories` — all 6 `template_categories` with counts, plus a synthesised `all` |
 | GET | `/api/v1/templates/:slug` | session | one template; `id` in the body **is the slug**. No `previewUrl`: previewing is a frontend concern (see Decision log, 2026-11-19) |
 | GET | `/api/v1/templates/:slug/pages/:key` | session | one template page, addressed by its manifest key |
+| GET | `/api/v1/websites/:id/assets` | session | browse the website's own prefix. Query `path` (folder, `a-z0-9._-/` only, no `..`); returns `folders` + `files` one level deep, with `truncated` past 1000 objects |
 | POST | `/api/v1/websites/:id/assets` | session | multipart upload into the website's own prefix. Type is **sniffed**, not trusted; returns the public URL |
+| DELETE | `/api/v1/websites/:id/assets?key=` | session | delete one file. A key outside the website's own prefix is `404`, never a cross-prefix delete |
+| GET | `/api/v1/websites/:id/store-settings` | session | every payment and delivery method the tenant owns, each with `selected` for this website and `enabledGlobally` from the method itself |
+| PATCH | `/api/v1/websites/:id/store-settings` | session | select or deselect one method: `{"payment":{"id","selected"}}` or `{"delivery":{…}}`. Removing the **last** selected payment or delivery method is `422`; an id outside the tenant is `404` |
 | GET | `/api/v1/storage` | session | platform storage: per-website usage, totals, and the licence allowance |
 | GET | `/api/v1/storefront/:site` | **public** | a live website by subdomain: content + commerce options. Draft and paused return 404 |
 | GET/PUT | `/api/v1/site-content/:id` | session | the editor's read and save: theme, chrome and every page's seo/sections/settings |
-| GET/POST | `/api/v1/websites` | session | list / create. **Create takes a template reference only** (`templateId` is the template slug); the backend copies the structure |
+| GET/POST | `/api/v1/websites` | session | list / create. **Create takes a template reference only** (`templateId` is the template slug); the backend copies the structure and links **only** the tenant's default COD and store-pickup methods |
 | GET | `/api/v1/websites/check-subdomain?subdomain=` | session | `{subdomain, available, suggestion?}` for the create wizard |
 | GET/PATCH/DELETE | `/api/v1/websites/:id` | session | one website. `PATCH` is partial and handles publish; `DELETE` also purges the storage prefix |
 | GET | `/api/v1/websites/:id/pages` | session | the website's copied pages |
@@ -384,10 +388,37 @@ BodyLimit → Timeout`, then per-route `Authenticate` (required or optional) and
 `bootstrap.eventPublisher` adapts `auth/service.Event` onto `messaging.Envelope`, so the auth module
 never imports the messaging package and the platform never imports a module.
 
+`websites/service.Methods` is the one cross-module contract the websites module declares: a single
+`EnsureDefaultMethod(ctx, tenantID) (uuid.UUID, error)`, satisfied by both `payments/service` (COD) and
+`delivery/service` (store pickup) and wired in `bootstrap/modules.go`. It replaced `EnabledMethodIDs`,
+which linked every enabled method to a new website.
+
 ---
 
 ## Known gaps
 
+- **A logo chosen in the create wizard stays base64 in `websites.theme` until the first editor save.**
+  The wizard has no website to upload to yet, so it keeps the file as a data URL and `POST /websites`
+  writes it into the theme JSONB; every storefront read then carries it. The editor's save-time commit
+  (below) now catches it, because it walks the whole draft — but only once the customer edits and
+  saves something. Fixing it properly means the wizard uploading the logo after create and saving the
+  content back, which is three round trips in the success path.
+- **A tenant's default store-pickup method can be created twice under a race.** `payment_methods` has
+  `UNIQUE (tenant_id, type, provider)`, so the COD find-or-create collapses onto one row; the pickup
+  equivalent is only protected by `UNIQUE (tenant_id, name)`, so two website creations landing at the
+  same instant for a tenant with no pickup method can both insert — once under the default name (the
+  second then reads it back) and once under a name a customer already chose. Both rows are valid
+  delivery methods, so this is clutter, not corruption. A partial unique index on
+  `(tenant_id) WHERE partner = 'pickup'` would close it but would also forbid two pickup locations,
+  which is a real use case, so it was not added.
+- **`/websites/:id/store-settings` covers payments and delivery only.** The frontend's
+  `WebsiteStoreSettings` type also carried `auth` (per-website shopper sign-in) and `storage` (use the
+  tenant's own bucket). Neither has a backend: there is no authentication module, and storage is
+  platform-managed since 2026-11-19, so a connected-bucket switch has nothing to write to. Both
+  sections were removed from the contract and from the editor rather than stubbed.
+- **The asset browser lists at most 1000 objects per folder** and reports `truncated` past that.
+  `storage.Store.List` takes a limit but no continuation token, so there is no second page to ask for;
+  a website with more files than that cannot reach the rest from the UI.
 - **No `audit-worker`.** Auth's facts (`auth.user_registered`, `auth.password_changed`,
   `auth.user_logged_in` / `_login_failed`, `auth.user_logged_out`) are published to the stream and
   nothing reads them; there is no `audit_events` table. The stream grows until `EVENTS_STREAM_MAXLEN`
@@ -835,6 +866,68 @@ never imports the messaging package and the platform never imports a module.
 
 ---
 
+- **2026-11-22** — **A new website starts with cash on delivery and store pickup, nothing else.**
+  This reverses the 2026-11-21 decision that `Create` links *every* enabled payment and delivery
+  method: the owner's call is that a website opens with one payment option and one delivery option,
+  and the customer adds the rest per website from the editor. `websites/service.Methods` shrank from
+  `EnabledMethodIDs(ctx, tenantID) ([]uuid.UUID, error)` to
+  `EnsureDefaultMethod(ctx, tenantID) (uuid.UUID, error)`; `payments/service` find-or-creates the
+  tenant's `cod`/`offline` method (display name "Cash on delivery", no fee) and `delivery/service`
+  its `pickup`/`pickup` method ("Store pickup", free, same day, all-India). Both **reuse** an existing
+  row rather than creating a second one, and neither re-enables a method the customer switched off —
+  the storefront query already hides a disabled method, so respecting the switch costs nothing.
+  Find-or-create runs **before** the create transaction, because a cross-module service call cannot
+  join another module's transaction; a website creation that then fails leaves a usable default
+  method behind, which is harmless and idempotent. Cost to reverse: one service method per module and
+  one test file each; no schema change was needed, because `website_payment_methods` and
+  `website_delivery_methods` already existed.
+- **2026-11-22** — **Per-website method selection reads and writes the join tables directly, from the
+  websites module.** `GET/PATCH /websites/:id/store-settings` was the one endpoint the frontend's
+  `features/website-settings` already called and the backend never had. The choice was between
+  widening the cross-module `Methods` interface to hand over full method rows, or querying
+  `payment_methods` / `delivery_methods` from the websites repository with a `LEFT JOIN` onto the link
+  table. The second was taken: the websites repository **already** joins both tables for the
+  storefront's commerce options (`PaymentOptions` / `DeliveryOptions`), so this follows the existing
+  precedent instead of inventing a second pattern, and the tenant predicate sits on both sides of
+  every join. `PATCH` takes one method at a time (`{"payment":{"id","selected"}}`), which is what the
+  editor's switches send and what makes the optimistic update in `websiteSettingsApi` correct.
+- **2026-11-22** — **A website must keep at least one payment method and one delivery method.**
+  Deselecting the last one is `422 validation_failed`, not a silently empty checkout. A storefront
+  with no payment option cannot take an order, and the failure would otherwise surface to a shopper
+  rather than to the customer who caused it. The UI shows the last remaining switch disabled with the
+  reason. Cost to reverse: delete two guards in `service/store.go`.
+- **2026-11-22** — **The store-settings contract carries payments and delivery only.** The frontend
+  type also had `auth` (per-website shopper sign-in, overriding an organisation default) and `storage`
+  (use the tenant's own bucket). There is no authentication module to read sign-in defaults from, and
+  storage has been platform-managed since 2026-11-19, so a "use the connected bucket" switch has
+  nothing to write. Rather than return invented values that look production-ready, both sections were
+  dropped from the DTO and removed from the editor panel. Sign-in returns when the authentication
+  module lands; the storefront's `signIn` block is untouched.
+- **2026-11-22** — **The storage screen browses the bucket instead of only totalling it.**
+  `GET /websites/:id/assets?path=` folds a flat S3 listing into one level of folders plus files, and
+  `DELETE /websites/:id/assets?key=` removes one file. Both resolve the website first, through the
+  tenant-scoped `Get`, and the delete additionally requires the key to start with that website's own
+  `storage_prefix` — so a key belonging to another tenant is `404` before `Store.Delete` is ever
+  called. The folder path is validated against `[a-zA-Z0-9._/-]` with `..` and `//` rejected, since it
+  is concatenated onto the prefix. No new storage adapter work was needed: `Store.List` and
+  `Store.Delete` already existed and had no caller.
+
+- **2026-11-22** — **Pictures picked in the editor reach S3 on save, not on pick.** Owner's call. The
+  editor used to upload the moment a file was chosen, so discarding an edit — or closing the tab —
+  left a file in the bucket that nothing referenced and no screen could explain, while still counting
+  against the tenant's `storage_limit_bytes`. The editor now passes **no** uploader into its image
+  fields, so `ImageUpload` falls back to the data URL it already produced for the create wizard; the
+  preview renders it directly, because both the storefront's `Media` and the header logo already
+  handle data URLs. `features/storefront/assets.ts` walks the draft on save, uploads each **distinct**
+  data URL once however many sections share it, swaps in the returned URL and only then `PUT`s the
+  content — so a base64 blob is never written to `website_pages.sections`. A failed upload aborts the
+  save with a toast and keeps whatever did upload, so retrying never uploads the same picture twice.
+  Publish takes the same path. Cost to reverse: pass `upload` back into the `AssetUploadProvider`
+  value and delete one module. **Not changed**: replacing or deleting a picture still leaves the old
+  object in the bucket. Deleting it on save would be wrong without reference counting — the same URL
+  can be used by several sections and by other pages — so files are removed from the Storage screen
+  by hand.
+
 ## Build log
 
 *Append-only. Newest last.*
@@ -1209,3 +1302,45 @@ never imports the messaging package and the platform never imports a module.
   **Not verified by the assistant**: those three skip without `TEST_S3_*`, and reading MinIO's
   credentials out of the running container was refused, so the S3 path has been exercised only by
   compilation and by the unit tests — run them with real credentials before trusting uploads.
+
+- **2026-11-22** — Per-website commerce, new-website defaults and an asset browser. Three gaps closed
+  in one pass, no migration. (1) `GET/PATCH /websites/:id/store-settings` now exists — the frontend
+  had been calling it since the website-settings feature was written and getting a 404. (2) Website
+  create links only the tenant's default COD and store-pickup methods, find-or-creating each, instead
+  of every enabled method. (3) `GET`/`DELETE /websites/:id/assets` browse and delete inside the
+  website's own storage prefix, so the per-website bucket is visible as folders and files rather than
+  a byte count. 19 new unit tests: COD and pickup defaults are created once, reused when present,
+  never re-enabled behind the customer's back and never taken from another tenant; create links
+  exactly one of each and asks with the caller's tenant id; store-settings refuses a foreign method
+  id (`404`), an empty patch (`422`) and the removal of the last payment or delivery method (`422`);
+  the asset listing splits a root into folders and files, opens a folder, rejects `..` in a path and
+  returns `404` for another tenant; delete refuses a key outside the website's prefix without
+  touching the store. Ran: `go build ./... && go vet ./... && gofmt -l .` clean, `go test ./...`
+  green (133 unit tests). **Not verified by the assistant**: nothing was run against Postgres, MinIO
+  or a live API — the new SQL (two `LEFT JOIN`s and four link writes) and the S3 listing path have
+  been exercised only by fakes, so they inherit the gap already recorded for every other repository.
+  Frontend, same change: `features/website-settings` dropped its `auth` and `storage` sections to match
+  the contract above; the editor's store panel lost those two rows and now disables the last remaining
+  payment or delivery switch with a reason rather than letting the save fail; the Storage screen is now
+  a **file manager** — breadcrumbs, one `DataTable` of folder and file rows, nothing else. Its root
+  lists one folder per website; opening one walks in a level at a time, which is how the backend
+  returns it. **Owner's correction, twice**: the first attempt was a per-website drill-down screen
+  (`AssetBrowser`), the second an always-expanded tree (`StorageTree`); both are deleted. The owner
+  also removed the stat tiles and the licence allowance panel from this screen — usage is one line in
+  the page description — because the screen is for finding a file, not for reading numbers.
+  `ImageUpload` gained a *Choose existing* button backed by a new `AssetPicker`, which shows the
+  website's folder and its subfolders together rather than making the customer find `media/`. `ImageUpload`'s preview also
+  stopped routing S3 URLs through the Next image optimiser, which is configured for `/images/**` only
+  and would have failed on every customer upload. The create flow's review step now states what a new
+  website starts with. Ran: `npx tsc --noEmit`, `npm run lint` and `npm run build` — all clean.
+
+- **2026-11-22** — Editor uploads became deferred. Picking a picture in the website editor no longer
+  writes to S3; it holds a data URL in the draft, the preview shows it immediately, and the save (or
+  publish) uploads every pending picture and rewrites the content to point at the stored files. The
+  header says `2 pictures will upload when you save` while they are pending and the save button counts
+  them off (`Uploading 2 of 3…`). Discard now genuinely costs nothing: no object, no allowance. The
+  per-website usage on the Storage screen is driven by the same `Asset`/`StorageConfig` cache tags, so
+  it reflects the new files as soon as the save completes. Frontend only — no endpoint, schema or Go
+  change. Ran: `npx tsc --noEmit`, `npm run lint`, `npm run build` — all clean. **Not verified by the
+  assistant**: no browser run, so the data-URL → `File` → multipart round trip has been checked by
+  types and compilation only.

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Lock } from "lucide-react";
+import { ArrowLeft, Banknote, Check, Lock, Store } from "lucide-react";
 import { Alert } from "@/components/platform/Alert";
 import { FormField } from "@/components/platform/FormField";
 import { ImageUpload } from "@/components/platform/ImageUpload";
@@ -325,15 +325,15 @@ export function CreateWebsiteFlow() {
                         {governed && (
                           <span className="inline-flex items-center gap-1 text-xs text-muted">
                             <Lock className="size-3" aria-hidden />
-                            Follows customer accounts
+                            Customer accounts
                           </span>
                         )}
                       </div>
                       <p className="mt-1 text-sm text-muted">{page.description}</p>
                       {page.required && page.requiredReason && <p className="mt-1 text-xs text-muted">{page.requiredReason}</p>}
-                      {governed && <p className="mt-1 text-xs text-muted">Appears while this website offers customer sign-in, which you set up after creating it.</p>}
+                      {governed && <p className="mt-1 text-xs text-muted">Part of customer accounts, which every website has.</p>}
                     </div>
-                    <div className="pt-0.5" title={page.required ? page.requiredReason : governed ? "This page follows your customer accounts setting." : undefined}>
+                    <div className="pt-0.5" title={page.required ? page.requiredReason : governed ? "Customer accounts are part of every website." : undefined}>
                       <Switch
                         checked={page.required || governed ? true : !off}
                         disabled={page.required || governed}
@@ -377,6 +377,24 @@ export function CreateWebsiteFlow() {
                 }`}
               />
             </dl>
+            <h3 className="font-heading mt-8 text-base font-semibold text-ink">Checkout</h3>
+            <p className="mt-1 text-sm text-muted">
+              Every new website opens with one way to pay and one way to receive an order. Add the rest from the
+              editor once it exists — each website chooses its own.
+            </p>
+            <ul className="mt-4 flex flex-col gap-2">
+              <StartsWith
+                icon={<Banknote className="size-[18px] text-muted" aria-hidden />}
+                title="Cash on delivery"
+                hint="Your customer pays the courier. Add UPI or cards in the editor."
+              />
+              <StartsWith
+                icon={<Store className="size-[18px] text-muted" aria-hidden />}
+                title="Store pickup"
+                hint="Your customer collects the order. Add a courier in the editor."
+              />
+            </ul>
+
             {limitReached && (
               <Alert tone="warning" className="mt-5">
                 Your licence includes {license?.allowance ?? 0} websites and all of them are in use.
@@ -441,6 +459,18 @@ function ReviewRow({ label, value, mono }: { label: string; value: React.ReactNo
       <dt className="text-sm text-muted">{label}</dt>
       <dd className={cn("text-sm text-ink", mono && "font-mono")}>{value}</dd>
     </div>
+  );
+}
+
+function StartsWith({ icon, title, hint }: { icon: React.ReactNode; title: string; hint: string }) {
+  return (
+    <li className="flex items-start gap-3 rounded-md border border-line bg-surface p-3">
+      {icon}
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink">{title}</p>
+        <p className="mt-0.5 text-xs text-muted">{hint}</p>
+      </div>
+    </li>
   );
 }
 

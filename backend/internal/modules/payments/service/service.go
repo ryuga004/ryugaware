@@ -18,13 +18,14 @@ import (
 const (
 	DefaultPageSize = 20
 	MaxPageSize     = 100
+	DefaultCODName  = "Cash on delivery"
 )
 
 type Repo interface {
 	List(ctx context.Context, f repository.Filter) ([]model.Method, error)
 	Count(ctx context.Context, f repository.Filter) (int64, error)
 	CountEnabled(ctx context.Context, tenantID uuid.UUID) (int64, error)
-	EnabledIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error)
+	ByTypeProvider(ctx context.Context, tenantID uuid.UUID, kind, provider string) (*model.Method, error)
 	Get(ctx context.Context, tenantID, id uuid.UUID) (*model.Method, error)
 	Create(ctx context.Context, m *model.Method) error
 	Update(ctx context.Context, tenantID, id uuid.UUID, fields map[string]any) error
@@ -304,6 +305,37 @@ func optional(v string) *string {
 	return &v
 }
 
-func (s *Service) EnabledMethodIDs(ctx context.Context, tenantID uuid.UUID) ([]uuid.UUID, error) {
-	return s.repo.EnabledIDs(ctx, tenantID)
+func (s *Service) EnsureDefaultMethod(ctx context.Context, tenantID uuid.UUID) (uuid.UUID, error) {
+	existing, err := s.repo.ByTypeProvider(ctx, tenantID, model.TypeCOD, model.ProviderOffline)
+	if err != nil {
+		return uuid.Nil, apperrors.Internal(err)
+	}
+	if existing != nil {
+		return existing.ID, nil
+	}
+
+	now := s.now().UTC()
+	m := &model.Method{
+		ID:          uuid.New(),
+		TenantID:    tenantID,
+		Type:        model.TypeCOD,
+		Provider:    model.ProviderOffline,
+		DisplayName: DefaultCODName,
+		Enabled:     true,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := s.repo.Create(ctx, m); err != nil {
+		if database.IsUniqueViolation(err) {
+			raced, lookupErr := s.repo.ByTypeProvider(ctx, tenantID, model.TypeCOD, model.ProviderOffline)
+			if lookupErr != nil {
+				return uuid.Nil, apperrors.Internal(lookupErr)
+			}
+			if raced != nil {
+				return raced.ID, nil
+			}
+		}
+		return uuid.Nil, apperrors.Internal(err)
+	}
+	return m.ID, nil
 }

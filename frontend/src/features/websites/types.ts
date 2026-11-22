@@ -18,8 +18,6 @@ export interface Website {
   createdAt: string;
   updatedAt: string;
   lastPublishedAt: string | null;
-  /** Where this website's media lives. Defaults to the organisation's connected bucket. */
-  storage?: "platform" | "connected";
 }
 
 export interface WebsiteFilters {

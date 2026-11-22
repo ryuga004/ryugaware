@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { FormField } from "@/components/platform/FormField";
 import { ImageUpload } from "@/components/platform/ImageUpload";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useState } from "react";
 import { Button, IconButton } from "@/components/ui/Button";
 import { ColorInput } from "@/components/ui/ColorInput";
 import { Input } from "@/components/ui/Input";
@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/Select";
 import { Switch } from "@/components/ui/Switch";
 import { Textarea } from "@/components/ui/Textarea";
 import type { FieldDef, SitePage } from "../../types";
+import { AssetPicker } from "./AssetPicker";
 
 /**
  * Renders an editing form from a template's field schema.
@@ -18,12 +19,16 @@ import type { FieldDef, SitePage } from "../../types";
  * This is why a new template needs no editor code: the manifest says a hero has a heading, an
  * image and a link, and the right controls appear. The renderer reads the same values back.
  */
-type Uploader = (file: File) => Promise<string>;
+export interface AssetSource {
+  /** Omitted in the create wizard, where no website — and so no storage folder — exists yet. */
+  websiteId?: string;
+  upload?: (file: File) => Promise<string>;
+}
 
-const UploadContext = createContext<Uploader | undefined>(undefined);
+const AssetContext = createContext<AssetSource>({});
 
-/** Supplies the editor's asset uploader to every `image` field below it. */
-export const AssetUploadProvider = UploadContext.Provider;
+/** Supplies the editor's uploader and website id to every `image` field below it. */
+export const AssetUploadProvider = AssetContext.Provider;
 
 export function FieldsForm({
   fields,
@@ -61,7 +66,6 @@ function Field({
   onChange: (value: unknown) => void;
   onError?: (message: string) => void;
 }) {
-  const upload = useContext(UploadContext);
   const text = typeof value === "string" ? value : "";
 
   if (field.type === "boolean") {
@@ -110,7 +114,7 @@ function Field({
           case "color":
             return <ColorInput {...control} value={text} onChange={onChange} />;
           case "image":
-            return <ImageUpload id={control.id} value={text || null} onChange={(v) => onChange(v ?? "")} onError={onError} upload={upload} />;
+            return <ImageField id={control.id} value={text} onChange={(v) => onChange(v)} onError={onError} />;
           case "link":
             return <LinkField {...control} value={text} pages={pages} onChange={onChange} />;
           default:
@@ -118,6 +122,44 @@ function Field({
         }
       }}
     </FormField>
+  );
+}
+
+/** Upload a new picture, or reuse one already in this website's storage folder. */
+function ImageField({
+  id,
+  value,
+  onChange,
+  onError,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  onError?: (message: string) => void;
+}) {
+  const { websiteId, upload } = useContext(AssetContext);
+  const [picking, setPicking] = useState(false);
+
+  return (
+    <>
+      <ImageUpload
+        id={id}
+        value={value || null}
+        onChange={(v) => onChange(v ?? "")}
+        onError={onError}
+        upload={upload}
+        onBrowse={websiteId ? () => setPicking(true) : undefined}
+      />
+      {websiteId && (
+        <AssetPicker
+          open={picking}
+          websiteId={websiteId}
+          value={value || null}
+          onClose={() => setPicking(false)}
+          onSelect={onChange}
+        />
+      )}
+    </>
   );
 }
 
